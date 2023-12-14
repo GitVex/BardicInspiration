@@ -28,7 +28,7 @@ export async function checkImageAvailability(url: string): Promise<boolean> {
 
 		return true;
 	} catch (error) {
-		console.log(error);
+		//console.log(error);
 		throw error;
 	}
 }

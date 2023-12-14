@@ -8,6 +8,8 @@ import { ViewColumn } from './Viewer/ViewColumn';
 import FilterStateProvider from './contexts/RebuiltFilterStateProvider';
 import CreateSideMenu from './Creator/CreateSideMenu';
 import PlayerTopMenu from './Player/PlayerTopMenu';
+import UserDisplayComponent from './Login/UserDisplayComponent';
+import UserMenu from './Login/UserSideMenu';
 
 function PageComponent() {
 	const context = useContext(WindowSizeContext);

@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@auth0/nextjs-auth0": "^3.5.0",
     "@material-tailwind/react": "^2.1.5",
     "@prisma/client": "^4.13.0",
     "@types/node": "18.11.15",
@@ -22,6 +23,7 @@
     "framer-motion": "^7.10.0",
     "jimp": "^0.22.8",
     "next": "13.0.6",
+    "nextjs": "^0.0.3",
     "openai": "^3.1.0",
     "postgres": "^3.3.3",
     "react": "18.2.0",

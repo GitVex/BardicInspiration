@@ -1,8 +1,9 @@
 import React from 'react';
-import Tester from '../components/utils/testing/Tester';
+import UserSideMenu from '../components/Login/UserSideMenu';
+import Tester from '../components/utils/testing/TesterLogin';
 
 function test() {
-	return <Tester />;
+	return <UserSideMenu />;
 }
 
 export default test;

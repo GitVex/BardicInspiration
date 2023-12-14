@@ -3,6 +3,8 @@ import WindowWidthContext from '../contexts/WindowSizeProvider';
 import { breakpoints } from '../utils/breakpoints';
 import { motion } from 'framer-motion';
 import CreateUI from './CreateUI';
+import UserMenu from '../Login/UserSideMenu';
+import { menu } from '@material-tailwind/react';
 
 const menuWidth = 500;
 
@@ -27,6 +29,8 @@ const PlusVariants = {
 function CreateSideMenu({ className }: { className?: string }) {
 	const [isOpenCreate, setIsOpenCreate] = useState(false);
 
+	const style = className ? className : '';
+
 	const context = useContext(WindowWidthContext);
 	const windowWidth = context?.windowWidth;
 
@@ -34,7 +38,7 @@ function CreateSideMenu({ className }: { className?: string }) {
 		windowWidth !== null &&
 		windowWidth >= breakpoints.sm ? (
 		<motion.div
-			className={`relative ${className}`}
+			className={`relative ${style}`}
 			animate={isOpenCreate ? 'open' : 'closed'}
 			initial='closed'
 			variants={SideBarVariants}
@@ -70,6 +74,10 @@ function CreateSideMenu({ className }: { className?: string }) {
 					/>
 				</svg>
 			</motion.div>
+
+			<div className='relative ' style={{ left: menuWidth + 48, transform: 'translateY(-2px)' }}>
+				<UserMenu />
+			</div>
 		</motion.div>
 	) : (
 		<div />
