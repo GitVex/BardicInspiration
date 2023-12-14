@@ -73,11 +73,11 @@ function UserDisplayComponent() {
 				</div>
 
 				{isModalOpen && (
-					<div className='absolute z-5 top-full left-0 mt-2 flex w-fit flex-col rounded-lg border border-darknavy-500 bg-darknavy-700 p-2 text-sm text-darknavy-200 shadow-lg'>
+					<div className='z-5 absolute top-full left-0 mt-2 flex w-fit flex-col gap-1 rounded-lg border border-darknavy-500 bg-darknavy-700 p-2 text-sm text-darknavy-200 shadow-lg'>
 						{/* Modal content goes here */}
 						<p className=''>User</p>
 						{/* Add more content as needed */}
-						<p className='text-red-600 cursor-pointer'>
+						<p className='cursor-pointer text-red-600'>
 							{/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
 							<a href='/api/auth/logout'>Logout</a>
 						</p>

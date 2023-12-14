@@ -19,7 +19,7 @@ function UserMenu() {
 							viewBox='0 0 24 24'
 							strokeWidth={1.5}
 							stroke='currentColor'
-							className='h-8 w-8'
+							className='h-8 w-8 text-red-600'
 						>
 							<path
 								strokeLinecap='round'

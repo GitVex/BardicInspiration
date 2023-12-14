@@ -3,7 +3,7 @@ import WindowWidthContext from '../contexts/WindowSizeProvider';
 import { breakpoints } from '../utils/breakpoints';
 import { motion } from 'framer-motion';
 import CreateUI from './CreateUI';
-import UserMenu from '../Login/UserSideMenu';
+import UserMenu from '../Login/UserMenu';
 import { menu } from '@material-tailwind/react';
 
 const menuWidth = 500;

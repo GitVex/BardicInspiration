@@ -1,5 +1,5 @@
 import React from 'react';
-import UserSideMenu from '../components/Login/UserSideMenu';
+import UserSideMenu from '../components/Login/UserMenu';
 import Tester from '../components/utils/testing/TesterLogin';
 
 function test() {

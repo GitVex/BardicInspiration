@@ -9,7 +9,7 @@ import FilterStateProvider from './contexts/RebuiltFilterStateProvider';
 import CreateSideMenu from './Creator/CreateSideMenu';
 import PlayerTopMenu from './Player/PlayerTopMenu';
 import UserDisplayComponent from './Login/UserDisplayComponent';
-import UserMenu from './Login/UserSideMenu';
+import UserMenu from './Login/UserMenu';
 
 function PageComponent() {
 	const context = useContext(WindowSizeContext);
