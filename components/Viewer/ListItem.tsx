@@ -33,15 +33,11 @@ function ListItem({ item }: { item: track & { tags: any } }) {
 							{item.title}
 						</p>
 					</Tooltip>
-					<motion.div
-						initial={{ opacity: 1 }}
-						animate={{ opacity: showTags ? 0 : 1 }}
-						transition={{ duration: 0.25 }}
-					>
+					<div>
 						<p className='truncate text-slate-600'>
 							<em>{!showTags && item.artist}</em>
 						</p>
-					</motion.div>
+					</div>
 					<motion.div
 						initial={{ opacity: 0 }}
 						animate={{ opacity: showTags ? 1 : 0 }}

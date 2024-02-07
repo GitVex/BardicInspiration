@@ -1,16 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useUser } from '@auth0/nextjs-auth0/client';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
+import UserLoggedInComponent from './UserLoggedInComponent';
 
 function UserDisplayComponent() {
-	const [isModalOpen, setIsModalOpen] = useState(false);
-
-	// Function to toggle modal visibility
-	const toggleModal = () => {
-		setIsModalOpen(!isModalOpen);
-	};
-
 	const { user, error, isLoading } = useUser();
 
 	let display;
@@ -58,33 +52,7 @@ function UserDisplayComponent() {
 				/>
 			</svg>
 		);
-	else if (user)
-		display = (
-			<div className='relative'>
-				<div onClick={toggleModal} className='cursor-pointer'>
-					<Image
-						/* @ts-ignore */
-						src={user.picture}
-						alt='Profile Picture'
-						width={32}
-						height={32}
-						className='rounded-full'
-					/>
-				</div>
-
-				{isModalOpen && (
-					<div className='z-5 absolute top-full left-0 mt-2 flex w-fit flex-col gap-1 rounded-lg border border-darknavy-500 bg-darknavy-700 p-2 text-sm text-darknavy-200 shadow-lg'>
-						{/* Modal content goes here */}
-						<p className=''>User</p>
-						{/* Add more content as needed */}
-						<p className='cursor-pointer text-red-600'>
-							{/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-							<a href='/api/auth/logout'>Logout</a>
-						</p>
-					</div>
-				)}
-			</div>
-		);
+	else if (user) display = <UserLoggedInComponent />;
 
 	return display ? (
 		display
