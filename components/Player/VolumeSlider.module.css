@@ -1,0 +1,9 @@
+/* General styles for the slider container */
+.container {
+    display: flex;
+    max-width: max-content;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    height: 100%;
+}

@@ -1,10 +1,10 @@
-import React from 'react'
-import PageComponent from '../components/PageComponent'
+import React from 'react';
+import MainApp from '../components/MainApp';
 
 function second() {
     return (
-        <PageComponent />
-    )
+        <MainApp />
+    );
 }
 
-export default second
+export default second;

@@ -1,107 +1,48 @@
 // ViewColumn.tsx
-// @ts-nocheck
-import React, { useEffect, useState } from 'react';
-import { useQuery } from 'react-query';
-import { track } from '@prisma/client';
-import ListItem from './ListItem';
-import { useFilterState } from '../contexts/RebuiltFilterStateProvider';
 import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState } from 'react';
+import { useItems } from './hooks/useItems';
 import LoadingAnim from '../utils/LoadingAnimDismount';
+import ListItem from './ListItem';
+import { Virtuoso } from 'react-virtuoso';
+import TItem from './types/TItem';
 
-export function ViewColumn({
-    children,
-    className,
-    style,
-    type = 'list',
-}: {
-    children?: React.ReactNode;
-    className?: string;
-    style?: React.CSSProperties;
+interface ViewColumnProps {
     type?: string;
-}) {
-    const filterState = useFilterState();
+}
+
+export function ViewColumn({ type = 'list' }: ViewColumnProps) {
     const [search, setSearch] = useState('');
-
-    let route = '/api/list';
-    if (type === 'new') {
-        route = '/api/new';
-    } else if (type === 'trend') {
-        route = '/api/list';
-    } else if (type === 'filter') {
-        route = '/api/filter';
-    } else if (type === 'owned') {
-        route = '/api/list';
-    } else {
-        route = '/api/list';
-    }
-
-    const { isLoading, error, data, refetch } = useQuery<track[], Error>(['items', type], fetchData, {
-        enabled: route === '/api/filter' ? false : true,
-        refetchInterval: 1000 * 60 * 20,
-        refetchOnWindowFocus: false,
-    });
-
-    async function fetchData(): Promise<track[]> {
-        const response = await fetch(route, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                filter: filterState,
-                origin: type,
-            }),
-        });
-        const res = await response.json();
-        // console.log(res);
-
-        return res;
-    }
-
-    useEffect(() => {
-        if (route === '/api/filter') {
-            refetch();
-        }
-    }, [filterState, refetch, route]);
+    const { data: items, isError, isLoading } = useItems(type);
 
     return (
-        <div className={className} style={style}>
+        <div className="h-full">
             <AnimatePresence mode="wait">
-                {isLoading ? (
+                {isError && (<p>Error: {isError.message}</p>)}
+                {isLoading && (
                     <motion.div key="loader" className="self-center">
                         <LoadingAnim />
                     </motion.div>
-                ) : error ? (
-                    <p>Error: {error.message}</p>
-                ) : data ? (
-                    <div className="flex flex-col gap-2">
+                )}
+                {items && (
+                    <div className="flex flex-col gap-2 h-full">
                         <input
                             type="text"
-                            className=" rounded bg-transparent p-1"
+                            className="rounded bg-transparent p-1"
                             placeholder="Search ..."
-                            onChange={e => {
+                            onChange={(e) => {
                                 setSearch(e.target.value);
                             }}
                         />
-                        <ul className=" flex max-h-full flex-col gap-2">
-                            {data?.map(item => {
-                                if (
-                                    item.title.toLowerCase().includes(search.toLowerCase()) ||
-                                    item.artist.toLowerCase().includes(search.toLowerCase())
-                                ) {
-                                    return (
-                                        <li key={item.id}>
-                                            <ListItem item={item} />
-                                        </li>
-                                    );
-                                } else {
-                                    return null;
-                                }
-                            })}
-                        </ul>
+                        <Virtuoso
+                            data={items.filter((item: TItem) =>
+                                item.title.toLowerCase().includes(search.toLowerCase()) ||
+                                item.artist.toLowerCase().includes(search.toLowerCase()),
+                            )}
+                            itemContent={(index, item) => <ListItem item={item} />}
+                            style={{ height: '100%', width: '100%' }}
+                        />
                     </div>
-                ) : (
-                    <p>no data</p>
                 )}
             </AnimatePresence>
         </div>

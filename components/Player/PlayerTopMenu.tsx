@@ -1,20 +1,13 @@
-import React, { useContext, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
+import { useWindowSize } from '../Contexts/WindowSizeProvider';
+import { DEFAULT_IS_OPEN_PLAYER_STATE } from '../utils/DEFAULTS';
 import PlayerUI from './PlayerUI';
-import { breakpoints } from '../utils/breakpoints';
-import WindowSizeContext from '../contexts/WindowSizeProvider';
 
-let DEFAULT_ISOPENPLAYER_STATE: boolean;
-if (process.env.NODE_ENV === 'development') {
-    DEFAULT_ISOPENPLAYER_STATE = false;
-} else {
-    DEFAULT_ISOPENPLAYER_STATE = false;
-}
+import { PlayerControlsProvider } from './Contexts/PlayerControlsProvider';
 
 function PlayerTopMenu() {
-    const context = useContext(WindowSizeContext);
-    const windowHeight = context?.windowHeight;
-    const windowWidth = context?.windowWidth;
+    const { isMobile, windowHeight } = useWindowSize();
 
     useEffect(() => {
         window.addEventListener('keydown', handleKeyPress);
@@ -23,13 +16,13 @@ function PlayerTopMenu() {
         };
     }, []);
 
-    const [isOpenPlayer, setIsOpenPlayer] = useState(DEFAULT_ISOPENPLAYER_STATE);
+    const [isOpenPlayer, setIsOpenPlayer] = useState(DEFAULT_IS_OPEN_PLAYER_STATE);
     const yInit = windowHeight ? windowHeight * -1 : -1000;
 
-    // create a listener that listens for the spacebar keypress
-    // if the spacebar is pressed, then toggle the isOpenPlayer state
+    // create a listener that listens for the space bar keypress
+    // if the space bar is pressed, then toggle the isOpenPlayer state
     const handleKeyPress = (e: KeyboardEvent) => {
-        // ignore the spacebar keypress if the user is typing in an input field
+        // ignore the space bar keypress if the user is typing in an input field
         if (e.target instanceof HTMLInputElement) return;
 
         if (e.code === 'Space') {
@@ -46,10 +39,10 @@ function PlayerTopMenu() {
         },
     };
 
-    return windowWidth !== undefined && windowWidth !== null && windowWidth >= breakpoints.lg ? (
+    return !isMobile ? (
         <>
             <motion.div
-                className="relative z-20 flex justify-center"
+                className="relative z-30 flex justify-center"
                 onClick={() => setIsOpenPlayer(prevIsOpenPlayer => !prevIsOpenPlayer)}
                 variants={buttonVariants}
                 animate={isOpenPlayer ? 'open' : 'closed'}
@@ -71,10 +64,12 @@ function PlayerTopMenu() {
                 initial={{ y: yInit }}
                 animate={isOpenPlayer ? { y: 0 } : { y: yInit }}
                 transition={{ duration: 1, ease: 'easeInOut' }}
-                className="absolute top-0 left-0"
+                className="absolute z-20 top-0 left-0"
             >
                 {/* @ts-ignore */}
-                <PlayerUI />
+                <PlayerControlsProvider>
+                    <PlayerUI />
+                </PlayerControlsProvider>
             </motion.div>
         </>
     ) : (

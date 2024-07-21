@@ -1,7 +1,6 @@
 import "../styles/globals.css";
 import type { AppProps, NextWebVitalsMetric } from "next/app";
-import { SpeedInsights } from "@vercel/speed-insights/next"
-import { WindowSizeProvider } from "../components/contexts/WindowSizeProvider";
+import { WindowSizeProvider } from "../components/Contexts/WindowSizeProvider";
 
 if (process.env.NODE_ENV !== "development") {
     console.log = () => {};

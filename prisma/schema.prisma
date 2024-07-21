@@ -5,11 +5,11 @@ generator client {
   provider = "prisma-client-js"
 }
 
-
 datasource db {
   provider          = "postgresql"
   url               = env("DATABASE_URL")
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+  directUrl         = env("DIRECT_URL")
 }
 
 model track {
@@ -21,8 +21,8 @@ model track {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   platform        String
-  color           String  @default("#000000")
-  luminance       Float   @default(0)
+  color           String   @default("#000000")
+  luminance       Float    @default(0)
   tags            tag[]
   presets         preset[]
 }
@@ -44,9 +44,9 @@ model preset {
 }
 
 model log {
-  id        Int      @id @default(autoincrement())
-  time      DateTime @default(now())
-  type      String
-  message   String
-  history   String[]
+  id      Int      @id @default(autoincrement())
+  time    DateTime @default(now())
+  type    String
+  message String
+  history String[]
 }

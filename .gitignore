@@ -36,3 +36,13 @@ yarn-error.log*
 next-env.d.ts
 .env
 certificates
+
+# Docker
+Dockerfile
+docker-compose.yml
+docker-compose.debug.yml
+.dockerignore
+launch.json
+tasks.json
+# Million Lint
+.million

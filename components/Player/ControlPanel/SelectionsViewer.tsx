@@ -1,19 +1,16 @@
-import React from 'react';
 import { motion } from 'framer-motion';
-import { PlayerState, PlayerStateAction, PresetState } from '../../contexts/states';
+import React from 'react';
+import { usePlayerControls } from '../Contexts/PlayerControlsProvider';
 
-interface SelectionsViewerProps {
-    presetControls: { presetState: PresetState; presetDispatch: React.Dispatch<PlayerStateAction> };
-}
-
-function SelectionsViewer(props: SelectionsViewerProps) {
-    const { presetState: preset, presetDispatch: dispatch } = props.presetControls;
+function SelectionsViewer() {
+    const { presetState: preset, presetDispatch: dispatch } = usePlayerControls();
     const players = preset.players;
 
     return (
         <div className="">
             <div className="flex flex-col items-center">
-                <div className="grid grid-cols-2 grid-rows-4 gap-2 rounded border-2 border-darknavy-700 bg-darknavy-500 p-4">
+                <div
+                    className="grid grid-cols-2 grid-rows-4 gap-2 rounded border-2 border-darknavy-700 bg-darknavy-500 p-4">
                     {players.map((player, index) => (
                         <div key={index} className={`relative flex h-8 w-10 rounded bg-transparent`}>
                             <motion.div

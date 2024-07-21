@@ -1,13 +1,7 @@
 import React from 'react';
-import { PresetState } from '../contexts/states';
-
-export function sleep(milliseconds: number) {
-	const date = Date.now();
-	let currentDate = null;
-	do {
-		currentDate = Date.now();
-	} while (currentDate - date < milliseconds);
-}
+import { PlayerStateAction } from '../Contexts/states';
+import IFPlayer from '../Player/types/IFPlayer';
+import { FadeOptions, fadeIn, fadeTo } from '../Player/fadeFunctions';
 
 function findExtremeIndex(
 	array: number[],
@@ -59,4 +53,59 @@ export function transformToTarget(input: string) {
 	} else {
 		return getVideoIdFromYoutubeUrl(input);
 	}
+}
+
+export function fadeInputHandler(
+    e: React.KeyboardEvent<HTMLInputElement>,
+    { framePlayer, localVolumeControl, savedVolumeControl, fadeIntervalControl }: FadeOptions
+) {
+    // Early return if no framePlayer or if the event key is not 'Enter'
+    if (!framePlayer || e.key !== 'Enter') return;
+
+    const inputValue = parseInt(e.currentTarget.value); // Directly access the input's value
+    const targetVolume = inputValue > 100 ? 100 : inputValue; // check input to not go over 100
+
+    // Further validation to proceed only if inputValue is a valid number
+    if (isNaN(targetVolume)) return;
+
+    // Define a callback to handle fading, choosing between fadeIn and fadeTo based on player state
+    const fadeAction = framePlayer.getPlayerState() !== 1 ? fadeIn : fadeTo;
+
+    // Execute the fading action with the provided parameters
+    fadeAction({
+        framePlayer,
+        localVolumeControl,
+        savedVolumeControl,
+        fadeIntervalControl,
+        pLimit: targetVolume,
+    });
+}
+
+export function loadNewVideo(
+    playerId: number,
+    dispatch: React.Dispatch<PlayerStateAction>,
+    framePlayer: IFPlayer,
+    input: string,
+    volume?: number
+) {
+    if (!framePlayer) return;
+
+    const target = transformToTarget(input);
+    if (!target) return;
+
+    framePlayer.setVolume(volume ?? framePlayer.getVolume());
+    framePlayer.loadVideoById(target);
+    framePlayer.pauseVideo();
+
+    dispatch({
+        type: 'setId',
+        index: playerId,
+        payload: target,
+    });
+
+    setTimeout(() => {
+        framePlayer.pauseVideo();
+        framePlayer.seekTo(0, true);
+        framePlayer.setLoop(true);
+    }, 1000);
 }
