@@ -1,5 +1,5 @@
 // PlayerContext.tsx
-import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { usePlayerHolderById } from '../../Contexts/PlayerHolderProvider';
 import { usePlayerControls } from './PlayerControlsProvider';
 import IFPlayer from '../types/IFPlayer';
@@ -65,6 +65,7 @@ export const PlayerLocalControlsProvider = ({ children, playerId }: PlayerLocalC
             index: playerId,
             payload: vol,
         });
+
         debouncedPresetDispatch({
             type: 'setVolume',
             index: playerId,
@@ -77,8 +78,13 @@ export const PlayerLocalControlsProvider = ({ children, playerId }: PlayerLocalC
             return;
         }
         framePlayer.setVolume(localVolume * masterVolumeModifier);
-    }, [framePlayer, localVolume, masterVolumeModifier]);
 
+        // debouncedPresetDispatch({
+        //     type: 'setVolume',
+        //     index: playerId,
+        //     payload: localVolume,
+        // });
+    }, [framePlayer, localVolume, masterVolumeModifier/*, playerId, debouncedPresetDispatch*/]);
 
     return (
         <PlayerLocalControlsContext.Provider value={{

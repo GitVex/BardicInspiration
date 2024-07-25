@@ -57,7 +57,7 @@ export default async function handle(req: NextApiRequest, res: NextApiResponse) 
             type: 'create',
             // later: log user id
             message: `Created new track: ${title} by ${author_name}`,
-            history: JSON.stringify(createTrack),
+            history: [JSON.stringify(createTrack)],
         },
     });
 

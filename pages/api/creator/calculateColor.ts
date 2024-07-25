@@ -131,7 +131,7 @@ export default async function handle(
             time: new Date(),
             type: 'update',
             message: `Updated ${updatedTracks.length} tracks with dominant color`,
-            history: JSON.stringify(updatedTracks),
+            history: [JSON.stringify(updatedTracks)],
         },
     });
 

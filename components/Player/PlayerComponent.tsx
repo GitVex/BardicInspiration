@@ -17,7 +17,7 @@ function PlayerComponent() {
 
     return (
         <motion.div
-            className="flex flex-col w-full h-full justify-around gap-2 rounded border-2 border-darknavy-700 bg-darknavy-500 p-1"
+            className="flex flex-row h-full w-full gap-2 rounded border-2 border-darknavy-700 bg-darknavy-500 p-1"
             animate={{
                 boxShadow: selected ? '0 0 8px 1px #f00' : '0 0 0 0px #fff',
             }}
@@ -29,8 +29,17 @@ function PlayerComponent() {
                 setSelected();
             }}
         >
-            <div className="flex w-full h-4/5 flex-row justify-around" onClick={e => e.stopPropagation()}>
+            <div className="flex flex-col h-full w-1/2 gap-1" onClick={e => e.stopPropagation()}>
                 <div className="rounded" id={ID} />
+                <LoadVideoInput />
+            </div>
+            <div className="flex flex-row gap-2 w-1/2 h-full"
+                 onClick={e => e.stopPropagation()}>
+                <div className="flex flex-col gap-2 h-full w-2/3">
+                    <FadeInButton />
+                    <FadeToInput />
+                    <FadeOutButton />
+                </div>
                 <VolumeSlider
                     volumeControl={{
                         localVolume,
@@ -39,13 +48,6 @@ function PlayerComponent() {
                     height={'90%'}
                     opaque={true}
                 />
-            </div>
-            <div className="flex h-1/5 w-full flex-row items-center justify-center gap-2"
-                 onClick={e => e.stopPropagation()}>
-                <LoadVideoInput />
-                <FadeInButton />
-                <FadeToInput />
-                <FadeOutButton />
             </div>
         </motion.div>
     );
@@ -71,7 +73,7 @@ function LoadVideoInput() {
 
     return <input
         type="text"
-        className="w-2/5 rounded bg-gray-800/50 p-1"
+        className="rounded bg-gray-800/50 p-1"
         placeholder="Video ID"
         onKeyDown={handleKeyDown}
     />;
@@ -89,7 +91,7 @@ function FadeInButton() {
     } = usePlayerLocalControls();
 
     return <button
-        className="w-1/5 rounded bg-gray-800/50 p-1 disabled:opacity-50"
+        className="rounded bg-gray-800/50 p-1 disabled:opacity-50"
         onClick={() => {
             fadeIn({
                 framePlayer,
@@ -117,7 +119,7 @@ function FadeToInput() {
 
     return <input
         type="text"
-        className=" w-1/5 rounded bg-gray-800/50 p-1"
+        className="rounded bg-gray-800/50 p-1"
         placeholder="Volume"
         onKeyDown={e => {
             fadeInputHandler(e, {
@@ -143,7 +145,7 @@ function FadeOutButton() {
     } = usePlayerLocalControls();
 
     return <button
-        className="w-2/6 rounded bg-gray-800/50 p-1 disabled:opacity-50"
+        className="rounded bg-gray-800/50 p-1 disabled:opacity-50"
         onClick={() => {
             fadeOut({
                 framePlayer,
