@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import React from 'react';
-import { useStackControls } from '../Contexts/StackControlsProvider';
+import { useStackControls } from '../../Contexts/StackControlsProvider';
 
 function SelectionsViewer() {
     const { presetState: preset, presetDispatch: dispatch } = useStackControls();

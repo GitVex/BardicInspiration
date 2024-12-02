@@ -1,5 +1,5 @@
 import React from 'react';
-import { PlayerStateAction } from '../Contexts/states';
+import { PlayerStateAction } from '../Player/Contexts/states';
 import IFPlayer from '../Player/types/IFPlayer';
 
 function findExtremeIndex(

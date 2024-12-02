@@ -1,7 +1,7 @@
 // PlayerContext.tsx
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { usePlayerHolderById } from '../../Contexts/PlayerHolderProvider';
-import { useStackControls } from './StackControlsProvider';
+import { useStackControls } from '../../Contexts/StackControlsProvider';
 import IFPlayer from '../types/IFPlayer';
 
 interface PlayerControlsProviderType {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { usePlayerHolder } from '../../Contexts/PlayerHolderProvider';
 import { loadNewVideo } from '../../utils/utils';
-import { useStackControls } from '../Contexts/StackControlsProvider';
+import { useStackControls } from '../../Contexts/StackControlsProvider';
 
 interface InitialPlayerLoaderProps {
     onLoaded: () => void;

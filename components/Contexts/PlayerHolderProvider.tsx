@@ -1,15 +1,10 @@
-import React, { useCallback, useContext, useEffect, useReducer, useState } from 'react';
+import React, { useContext, useEffect, useReducer } from 'react';
 import IFPlayer from '../Player/types/IFPlayer';
-import {
-    PlayerHolderState,
-    PlayerStateAction,
-    PresetState,
-    playerHolderReducer,
-    playerStateReducer,
-} from './states';
+import { playerHolderReducer, PlayerHolderState } from './states';
 import { useWindowSize } from './WindowSizeProvider';
+import { usePreset } from '../Player/Contexts/PresetProvider';
 
-import { DEFAULT_VIDEO_ID, DEFAULT_VOLUME, GLOBAL_DISABLE_SAVE_PRESET } from '../utils/DEFAULTS';
+import { DEFAULT_VIDEO_ID } from '../utils/DEFAULTS';
 
 const maxPlayers = 8;
 
@@ -23,38 +18,11 @@ const maxPlayers = 8;
 // https://developers.google.com/youtube/iframe_api_reference?
 
 // ----------------- CONTEXT DECLARATION -----------------
-
 // Create a custom hook to handle the initialization of multiple YouTube iframe players on a page
-// This is a workaround for the fact that the YouTube iframe api only allows one player per api call
+// This is a workaround for the fact that the YouTube iframe api only allows one api call per mount
 const PlayerHolderContext = React.createContext({} as PlayerHolderState);
 
-const PresetStateContext = React.createContext(
-    {} as {
-        presetState: PresetState;
-        presetDispatch: React.Dispatch<PlayerStateAction>;
-        disablePersistPreset: boolean;
-        setDisablePersistPreset: React.Dispatch<React.SetStateAction<boolean>>;
-        clearPersistPreset: () => void;
-    },
-);
-
 // ----------------- INITIAL STATES -----------------
-
-const initialPresetState: PresetState = {
-    title: 'New Preset',
-    players: Array(8)
-        .fill(null)
-        .map((_, index) => ({
-            id: index,
-            selected: false,
-            volume: DEFAULT_VOLUME,
-            savedVolume: { hasSaved: false, prevVol: DEFAULT_VOLUME },
-            pausedAt: Date.now(),
-            videoId: DEFAULT_VIDEO_ID,
-        })),
-    masterVolume: 100,
-};
-
 const initialPlayerHolderState: PlayerHolderState = {
     holders: Array(8)
         .fill(null)
@@ -67,19 +35,10 @@ const initialPlayerHolderState: PlayerHolderState = {
 };
 
 // ----------------- HOOKS -----------------
-
 export function usePlayerHolder() {
     const context = useContext(PlayerHolderContext);
     if (context === undefined) {
         throw new Error('usePlayerHolder must be used within a PlayerHolderProvider');
-    }
-    return context;
-}
-
-export function usePresetState() {
-    const context = useContext(PresetStateContext);
-    if (context === undefined) {
-        throw new Error('usePresetState must be used within a PresetStateContext');
     }
     return context;
 }
@@ -97,65 +56,11 @@ export function usePlayerHolderById(id: number) {
 }
 
 // ----------------- PROVIDER -----------------
-
 function PlayerHolderProvider({ children }: { children: React.ReactNode }) {
 
-    // ------- PRESET STATE PERSISTENCE -------
-
-    const loadPersistPreset = (): PresetState => {
-        const savedState = localStorage.getItem('presetState');
-        if (savedState) return JSON.parse(savedState);
-        return initialPresetState;
-    };
-    const savePersistPreset = (state: PresetState) => {
-        localStorage.setItem('presetState', JSON.stringify(state));
-    };
-    const clearPersistPreset = () => {
-        if (localStorage.getItem('presetState') === null) return;
-        // console.log('clearing preset');
-        localStorage.removeItem('presetState');
-    };
-
-    const [presetState, presetDispatch] = useReducer(playerStateReducer, initialPresetState);
-    const [disablePersistPreset, setDisablePersistPreset] = useState(GLOBAL_DISABLE_SAVE_PRESET);
-
-    useEffect(() => {
-        presetDispatch({
-            type: 'setPreset',
-            payload: loadPersistPreset(),
-        });
-    }, []);
-
-    const handleBeforeUnload = useCallback(
-        (e: BeforeUnloadEvent) => {
-            if (disablePersistPreset) return;
-            savePersistPreset(presetState);
-            e.preventDefault();
-            e.returnValue = '';
-        },
-        [disablePersistPreset, presetState],
-    );
-
-    useEffect(() => {
-        window.addEventListener('beforeunload', handleBeforeUnload);
-
-        return () => {
-            window.removeEventListener('beforeunload', handleBeforeUnload);
-        };
-    }, [handleBeforeUnload]);
-
-    // ------- PAUSED TIMER -------
-
-    const setPausedAt = (pIndex: number, pPayload: number) => {
-        presetDispatch({
-            type: 'setPausedAt',
-            index: pIndex,
-            payload: pPayload,
-        });
-    };
+    const { presetDispatch } = usePreset();
 
     // ------- YT IFRAME API INIT -------
-
     const [playerHolder, dispatchPlayerHolder] = useReducer(playerHolderReducer, initialPlayerHolderState);
     const { windowHeight, windowWidth } = useWindowSize();
 
@@ -201,11 +106,29 @@ function PlayerHolderProvider({ children }: { children: React.ReactNode }) {
             const changedState = player.getPlayerState();
 
             if (changedState === YT.PlayerState.PAUSED) {
-                setPausedAt(playerIdx, Date.now());
+                presetDispatch(
+                    {
+                        type: 'setPausedAt',
+                        index: playerIdx,
+                        payload: Date.now(),
+                    },
+                );
             } else if (changedState === YT.PlayerState.UNSTARTED) {
-                setPausedAt(playerIdx, Date.now());
+                presetDispatch(
+                    {
+                        type: 'setPausedAt',
+                        index: playerIdx,
+                        payload: Date.now(),
+                    },
+                );
             } else if (changedState === YT.PlayerState.PLAYING) {
-                setPausedAt(playerIdx, 9999999999999);
+                presetDispatch(
+                    {
+                        type: 'setPausedAt',
+                        index: playerIdx,
+                        payload: 9999999999999,
+                    },
+                );
             } else if (changedState === YT.PlayerState.ENDED) {
                 player.seekTo(0, true);
             }
@@ -277,21 +200,12 @@ function PlayerHolderProvider({ children }: { children: React.ReactNode }) {
     }, [playerHolder]); */
 
     return (
-        <PresetStateContext.Provider
-            value={{
-                presetState,
-                presetDispatch,
-                disablePersistPreset,
-                setDisablePersistPreset,
-                clearPersistPreset,
-            }}>
-            <PlayerHolderContext.Provider value={{
-                holders: playerHolder.holders,
-                firstLoadDone: playerHolder.firstLoadDone,
-            }}>
-                {children}
-            </PlayerHolderContext.Provider>
-        </PresetStateContext.Provider>
+        <PlayerHolderContext.Provider value={{
+            holders: playerHolder.holders,
+            firstLoadDone: playerHolder.firstLoadDone,
+        }}>
+            {children}
+        </PlayerHolderContext.Provider>
     );
 }
 

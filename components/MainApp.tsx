@@ -8,6 +8,8 @@ import { Viewer } from './Viewer/Viewer';
 import PlayerHolderProvider from './Contexts/PlayerHolderProvider';
 import FilterStateProvider from './Contexts/FilterStateProvider';
 import { useWindowSize } from './Contexts/WindowSizeProvider';
+import { StackControlsProvider } from './Contexts/StackControlsProvider';
+import PresetProvider from './Player/Contexts/PresetProvider';
 
 function MainApp() {
     const { isMobile } = useWindowSize();
@@ -17,17 +19,21 @@ function MainApp() {
             <div className="flex h-full flex-col gap-4 p-4 bg-darknavy-900 text-gray-200">
                 {/* Checking if the site should render the mobile version or the desktop version */}
                 {!isMobile ? (
-                        <PlayerHolderProvider>
-                            <FilterStateProvider>
-                                <div className="flex w-full flex-row justify-between">
-                                    <CreateSideMenu />
-                                    <PlayerTopMenu />
-                                    <FilterSideMenu />
-                                </div>
+                        <PresetProvider>
+                            <StackControlsProvider>
+                                <PlayerHolderProvider>
+                                    <FilterStateProvider>
+                                        <div className="flex w-full flex-row justify-between">
+                                            <CreateSideMenu />
+                                            <PlayerTopMenu />
+                                            <FilterSideMenu />
+                                        </div>
 
-                                <Viewer />
-                            </FilterStateProvider>
-                        </PlayerHolderProvider>
+                                        <Viewer />
+                                    </FilterStateProvider>
+                                </PlayerHolderProvider>
+                            </StackControlsProvider>
+                        </PresetProvider>
                     )
                     :
                     (

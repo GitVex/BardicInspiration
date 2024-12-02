@@ -1,7 +1,7 @@
 import { usePlayerHolder } from '../../Contexts/PlayerHolderProvider';
 import IFPlayer from '../types/IFPlayer';
 import { fadeIn, fadeOut } from '../fadeFunctions';
-import { useStackControls } from '../Contexts/StackControlsProvider';
+import { useStackControls } from '../../Contexts/StackControlsProvider';
 import ControlPanelButton from './utils/ControlPanelButton';
 import React from 'react';
 

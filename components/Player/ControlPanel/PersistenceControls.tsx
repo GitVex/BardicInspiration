@@ -1,5 +1,5 @@
 import ControlPanelButton from './utils/ControlPanelButton';
-import { useStackControls } from '../Contexts/StackControlsProvider';
+import { usePreset } from '../Contexts/PresetProvider';
 
 interface PersistenceControlsProps {
     initialLoadDone: boolean;
@@ -7,7 +7,7 @@ interface PersistenceControlsProps {
 
 function PersistenceControls({ initialLoadDone }: PersistenceControlsProps) {
 
-    const { disablePersistPreset, setDisablePersistPreset, clearPersistPreset } = useStackControls();
+    const { disablePersistPreset, setDisablePersistPreset, clearPreset } = usePreset();
     const disable = !initialLoadDone;
 
     const switchPersistPreset = () => {
@@ -15,7 +15,7 @@ function PersistenceControls({ initialLoadDone }: PersistenceControlsProps) {
     };
 
     const handleClearPersistPreset = () => {
-        clearPersistPreset();
+        clearPreset();
     };
 
     return (

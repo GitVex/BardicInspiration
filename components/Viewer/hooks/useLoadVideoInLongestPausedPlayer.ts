@@ -1,9 +1,10 @@
-import { usePlayerHolder, usePresetState } from '../../Contexts/PlayerHolderProvider';
+import { usePlayerHolder } from '../../Contexts/PlayerHolderProvider';
+import { usePreset } from '../../Player/Contexts/PresetProvider';
 import { argMin, loadNewVideo } from '../../utils/utils';
 
 export const useLoadVideoInLongestPausedPlayer = () => {
     const { holders: playerHolder } = usePlayerHolder();
-    const { presetState, presetDispatch } = usePresetState();
+    const { presetState, presetDispatch } = usePreset();
 
     return (url: string) => {
         // Check if players array is empty

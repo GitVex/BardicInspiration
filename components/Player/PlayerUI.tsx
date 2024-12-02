@@ -3,7 +3,7 @@ import VolumeSlider from './VolumeSlider';
 import ControlPanel from './ControlPanel/ControlPanel';
 import PlayerComponent from './PlayerComponent';
 import { PlayerControlsProvider } from './Contexts/PlayerControlsProvider';
-import { useStackControls } from './Contexts/StackControlsProvider';
+import { useStackControls } from '../Contexts/StackControlsProvider';
 
 function PlayerUI() {
     const { windowHeight, windowWidth } = useWindowSize();

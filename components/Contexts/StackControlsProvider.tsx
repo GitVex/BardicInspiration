@@ -1,17 +1,17 @@
 // PlayerContext.tsx
-import React, { createContext, useReducer, useState, useContext, useEffect, ReactNode } from 'react';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useReducer, useState } from 'react';
 import { useDebounceCallback } from 'usehooks-ts';
 import {
-    FadeAnimationsState,
     FadeAnimationsAction,
-    LocalVolumesState,
-    LocalVolumesAction,
     fadeAnimationsReducer,
+    FadeAnimationsState,
+    LocalVolumesAction,
     localVolumesReducer,
-} from '../types/states';
-import { PresetState, PlayerStateAction } from '../../Contexts/states';
-import { usePresetState } from '../../Contexts/PlayerHolderProvider';
-import { DEFAULT_VOLUME } from '../../utils/DEFAULTS';
+    LocalVolumesState,
+} from '../Player/types/states';
+import { PlayerStateAction, PresetState } from '../Player/Contexts/states';
+import { DEFAULT_VOLUME, GLOBAL_DISABLE_SAVE_PRESET } from '../utils/DEFAULTS';
+import { usePreset } from '../Player/Contexts/PresetProvider';
 
 const initialFadeAnimations: FadeAnimationsState = {
     fadeAnimationHandles: Array(9).fill(null),
@@ -25,9 +25,6 @@ interface StackControlsProviderType {
     presetState: PresetState;
     presetDispatch: React.Dispatch<PlayerStateAction>;
     debouncedPresetDispatch: any;
-    disablePersistPreset: boolean;
-    setDisablePersistPreset: React.Dispatch<React.SetStateAction<boolean>>;
-    clearPersistPreset: () => void;
     localVolumes: LocalVolumesState;
     localVolumesDispatch: React.Dispatch<LocalVolumesAction>;
     masterVolume: number;
@@ -35,19 +32,13 @@ interface StackControlsProviderType {
     masterVolumeModifier: number;
     fadeAnimations: FadeAnimationsState;
     fadeAnimationsDispatch: React.Dispatch<FadeAnimationsAction>;
-
 }
 
 const StackControlsContext = createContext<StackControlsProviderType | null>(null);
 
 export const StackControlsProvider = ({ children }: { children: ReactNode }) => {
-    const {
-        presetState,
-        presetDispatch,
-        disablePersistPreset,
-        setDisablePersistPreset,
-        clearPersistPreset,
-    } = usePresetState();
+    const { presetState, presetDispatch } = usePreset();
+
     const debouncedPresetDispatch = useDebounceCallback(presetDispatch, 1000);
 
     const [localVolumes, localVolumesDispatch] = useReducer(localVolumesReducer, initialVolumes);
@@ -61,21 +52,20 @@ export const StackControlsProvider = ({ children }: { children: ReactNode }) => 
     }, [masterVolume, debouncedPresetDispatch]);
 
     return (
-        <StackControlsContext.Provider value={{
-            presetState,
-            presetDispatch,
-            debouncedPresetDispatch,
-            disablePersistPreset,
-            setDisablePersistPreset,
-            clearPersistPreset,
-            localVolumes,
-            localVolumesDispatch,
-            masterVolume,
-            setMasterVolume,
-            masterVolumeModifier,
-            fadeAnimations,
-            fadeAnimationsDispatch,
-        }}>
+        <StackControlsContext.Provider
+            value={{
+                presetState,
+                presetDispatch,
+                debouncedPresetDispatch,
+                localVolumes,
+                localVolumesDispatch,
+                masterVolume,
+                setMasterVolume,
+                masterVolumeModifier,
+                fadeAnimations,
+                fadeAnimationsDispatch,
+            }}
+        >
             {children}
         </StackControlsContext.Provider>
     );

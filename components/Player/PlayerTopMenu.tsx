@@ -4,8 +4,6 @@ import { useWindowSize } from '../Contexts/WindowSizeProvider';
 import { DEFAULT_IS_OPEN_PLAYER_STATE } from '../utils/DEFAULTS';
 import PlayerUI from './PlayerUI';
 
-import { StackControlsProvider } from './Contexts/StackControlsProvider';
-
 function PlayerTopMenu() {
     const { isMobile, windowHeight } = useWindowSize();
 
@@ -67,9 +65,7 @@ function PlayerTopMenu() {
                 className="absolute z-20 top-0 left-0"
             >
                 {/* @ts-ignore */}
-                <StackControlsProvider>
-                    <PlayerUI />
-                </StackControlsProvider>
+                <PlayerUI />
             </motion.div>
         </>
     ) : (

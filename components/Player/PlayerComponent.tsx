@@ -3,7 +3,7 @@ import VolumeSlider from './VolumeSlider';
 import { fadeIn, fadeInputHandler, fadeOut } from './fadeFunctions';
 import { loadNewVideo } from '../utils/utils';
 import { usePlayerControls } from './Contexts/PlayerControlsProvider';
-import { useStackControls } from './Contexts/StackControlsProvider';
+import { useStackControls } from '../Contexts/StackControlsProvider';
 
 function PlayerComponent() {
     const {
