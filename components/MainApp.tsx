@@ -20,8 +20,8 @@ function MainApp() {
                 {/* Checking if the site should render the mobile version or the desktop version */}
                 {!isMobile ? (
                         <PresetProvider>
-                            <StackControlsProvider>
-                                <PlayerHolderProvider>
+                            <PlayerHolderProvider>
+                                <StackControlsProvider>
                                     <FilterStateProvider>
                                         <div className="flex w-full flex-row justify-between">
                                             <CreateSideMenu />
@@ -31,8 +31,8 @@ function MainApp() {
 
                                         <Viewer />
                                     </FilterStateProvider>
-                                </PlayerHolderProvider>
-                            </StackControlsProvider>
+                                </StackControlsProvider>
+                            </PlayerHolderProvider>
                         </PresetProvider>
                     )
                     :

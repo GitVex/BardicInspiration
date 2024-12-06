@@ -11,6 +11,8 @@ import {
 } from '../Player/types/states';
 import { PlayerStateAction, PresetState } from '../Player/Contexts/states';
 import { DEFAULT_VOLUME, GLOBAL_DISABLE_SAVE_PRESET } from '../utils/DEFAULTS';
+import { clearPreset, loadPreset, savePreset } from './utils/presetlocalStorageUtils';
+import { loadPersistPresetPref, savePersistPresetPref } from './utils/persistenceLocalStorageUtils';
 import { usePreset } from '../Player/Contexts/PresetProvider';
 
 const initialFadeAnimations: FadeAnimationsState = {
@@ -32,6 +34,10 @@ interface StackControlsProviderType {
     masterVolumeModifier: number;
     fadeAnimations: FadeAnimationsState;
     fadeAnimationsDispatch: React.Dispatch<FadeAnimationsAction>;
+    disablePersistPreset: boolean;
+    setDisablePersistPreset: React.Dispatch<React.SetStateAction<boolean>>;
+    clearPreset: () => void;
+    savePersistPresetPref: (preference: boolean) => void;
 }
 
 const StackControlsContext = createContext<StackControlsProviderType | null>(null);
@@ -45,11 +51,47 @@ export const StackControlsProvider = ({ children }: { children: ReactNode }) => 
     const [masterVolume, setMasterVolume] = useState(presetState.masterVolume);
     const [masterVolumeModifier, setMasterVolumeModifier] = useState(presetState.masterVolume / 100);
     const [fadeAnimations, fadeAnimationsDispatch] = useReducer(fadeAnimationsReducer, initialFadeAnimations);
+    const [disablePersistPreset, setDisablePersistPreset] = useState(GLOBAL_DISABLE_SAVE_PRESET);
+
+
+
+
 
     useEffect(() => {
         setMasterVolumeModifier(masterVolume / 100);
         debouncedPresetDispatch({ type: 'setMasterVolume', payload: masterVolume });
     }, [masterVolume, debouncedPresetDispatch]);
+
+    // Persist Preferences
+    useEffect(() => {
+        setDisablePersistPreset(loadPersistPresetPref());
+    }, []);
+
+    // ------- PRESET STATE PERSISTENCE -------
+    useEffect(() => {
+        presetDispatch({
+            type: 'setPreset',
+            payload: loadPreset(presetState),
+        });
+    }, []);
+
+    const handleBeforeUnload = useCallback(
+        (e: BeforeUnloadEvent) => {
+            if (disablePersistPreset) return;
+            savePreset(presetState);
+            e.preventDefault();
+            e.returnValue = '';
+        },
+        [disablePersistPreset, presetState],
+    );
+
+    useEffect(() => {
+        window.addEventListener('beforeunload', handleBeforeUnload);
+
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
+    }, [handleBeforeUnload]);
 
     return (
         <StackControlsContext.Provider
@@ -64,6 +106,10 @@ export const StackControlsProvider = ({ children }: { children: ReactNode }) => 
                 masterVolumeModifier,
                 fadeAnimations,
                 fadeAnimationsDispatch,
+                disablePersistPreset,
+                setDisablePersistPreset,
+                clearPreset,
+                savePersistPresetPref,
             }}
         >
             {children}

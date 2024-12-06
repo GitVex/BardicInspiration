@@ -1,4 +1,4 @@
-import { PresetState } from './states';
+import { PresetState } from '../../Player/Contexts/states';
 
 export const loadPreset = (initialPreset: PresetState): PresetState => {
     const savedState = localStorage.getItem('presetState');
