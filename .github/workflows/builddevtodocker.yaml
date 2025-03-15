@@ -53,7 +53,7 @@ jobs:
           envs: DATABASE_URL, DIRECT_URL, YOUTUBE_API_KEY
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
-          password: ${{ secrets.VPS_PWD }}
+          key: ${{ secrets.VPS_DEV_KEY }}
           port: 24279
           script: |
             cd /home/bardicInspiration_dev/BardicInspiration
