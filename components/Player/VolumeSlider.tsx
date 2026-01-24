@@ -1,7 +1,7 @@
 import Slider from '@mui/material/Slider';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { motion } from 'framer-motion';
-import { useEffect, useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { LocalVolumeControlEndType } from './types/states';
 import styles from './VolumeSlider.module.css';
 
@@ -39,61 +39,77 @@ interface VolumeSliderProps {
     textBgColor?: string;
     height?: number | string;
     opaque?: boolean;
+    bordered?: boolean;
 }
 
-const VolumeSlider = ({ volumeControl, height, opaque = false }: VolumeSliderProps) => {
+const VolumeSlider = ({ volumeControl, height, opaque = false, bordered = false }: VolumeSliderProps) => {
     const { localVolume, setLocalVolume } = volumeControl;
 
-    const [labelHeight, setLabelHeight] = useState(0);
-    const sliderRef = useRef<HTMLDivElement | null>(null);
+    const [labelCenter, setLabelCenter] = useState(0);
+
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const sliderRef = useRef<HTMLSpanElement | null>(null); // MUI Slider usually forwards ref to a span
+
+    const labelTimeoutIDRef = useRef<NodeJS.Timeout | null>(null);
+    const [showLabel, setShowLabel] = useState(false);
+
+    const delayHideLabel = useCallback(() => {
+        setShowLabel(true);
+        if (labelTimeoutIDRef.current) clearTimeout(labelTimeoutIDRef.current);
+        labelTimeoutIDRef.current = setTimeout(() => setShowLabel(false), 2500);
+    }, []);
 
     useEffect(() => {
-        if (sliderRef.current) {
-            const thumbRef = sliderRef.current.querySelector('.MuiSlider-thumb') as HTMLDivElement;
-            const thumbRect = thumbRef.getBoundingClientRect();
+        if (sliderRef.current && containerRef.current) {
+            const thumbRef = sliderRef.current.querySelector('.MuiSlider-thumb') as HTMLSpanElement;
 
-            const sliderRect = sliderRef.current.getBoundingClientRect();
+            if (thumbRef) {
+                const thumbRect = thumbRef.getBoundingClientRect();
+                const containerRect = containerRef.current.getBoundingClientRect();
 
-            setLabelHeight(thumbRect.y - sliderRect.y + thumbRect.height / 2 - 12);
+                const centerPosition = (thumbRect.y - containerRect.y) + (thumbRect.height / 2);
+
+                delayHideLabel();
+                setLabelCenter(centerPosition);
+            }
         }
-    }, [localVolume]);
+    }, [delayHideLabel, localVolume]);
 
-    const handleVolumeChange = useCallback(
-        (value: number) => {
-            setLocalVolume(value);
-        },
-        [setLocalVolume],
-    );
+    const handleVolumeChange = useCallback((value: number) => setLocalVolume(value), [setLocalVolume]);
 
     return (
-        <div className={`${styles.container} rounded border-2 border-darknavy-400/25`}
-             style={{ height: height ?? '80%' }}>
+        <div
+            ref={containerRef} // Attach ref here
+            className={`${styles.container} relative rounded ${bordered ? 'border-2' : ''} border-darknavy-400/25`}
+            style={{ height: height ?? '80%' }}
+        >
             <ThemeProvider theme={theme}>
                 <Slider
                     orientation="vertical"
                     value={localVolume}
-                    onChange={(e, val) => {
-                        handleVolumeChange(val as number);
-                    }}
-                    style={{ height: '90%' }}
-                    aria-labelledby="vertical-slider"
-                    size="small"
-                    // valueLabelDisplay={'on'}
+                    onChange={(e, val) => handleVolumeChange(val as number)}
                     ref={sliderRef}
+                    size="small"
                 />
             </ThemeProvider>
 
-            <div style={{ height: `90%` }}>
-                <motion.p
-                    className={`absolute ${opaque ? 'bg-darknavy-500' : ''} min-w-[26px]`}
-                    animate={{
-                        y: labelHeight,
-                        transition: { ease: 'easeOut', duration: 0.5 },
-                    }}
-                >
-                    {localVolume}
-                </motion.p>
-            </div>
+            <motion.p
+                className={`absolute m-0 leading-none flex items-center justify-center ${opaque ? 'bg-darknavy-500' : ''} min-w-[26px]`}
+
+                style={{ top: labelCenter }}
+                animate={{
+                    y: '-50%',
+                    x: showLabel ? -20 : -40,
+                    opacity: showLabel ? 1 : 0,
+                    transition: {
+                        y: { duration: 0 },
+                        opacity: { duration: 0.2 },
+                        x: { type: 'spring', stiffness: 300, damping: 30 },
+                    },
+                }}
+            >
+                {localVolume}
+            </motion.p>
         </div>
     );
 };
