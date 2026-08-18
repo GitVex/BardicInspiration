@@ -1,8 +1,8 @@
-import React, { useContext, useEffect, useReducer } from 'react';
+import React, { useCallback, useContext, useEffect, useReducer, useRef, useState } from 'react';
 import IFPlayer from '../Player/types/IFPlayer';
 import { playerHolderReducer, PlayerHolderState } from './states';
-import { useWindowSize } from './WindowSizeProvider';
 import { usePreset } from '../Player/Contexts/PresetProvider';
+import { loadYouTubeApi } from '../Player/ytApiLoader';
 
 import { DEFAULT_VIDEO_ID } from '../utils/DEFAULTS';
 
@@ -20,11 +20,20 @@ const maxPlayers = 8;
 // ----------------- CONTEXT DECLARATION -----------------
 // Create a custom hook to handle the initialization of multiple YouTube iframe players on a page
 // This is a workaround for the fact that the YouTube iframe api only allows one api call per mount
-const PlayerHolderContext = React.createContext({} as PlayerHolderState);
+//
+// Each PlayerComponent registers an empty wrapper element as its "slot". The players are built
+// directly inside those slots, because the API replaces the element it is handed - letting it
+// replace a node React rendered would leave React writing into a detached node. An iframe also
+// cannot be built elsewhere and moved in afterwards: reparenting an iframe reloads it.
+interface PlayerHolderContextType extends PlayerHolderState {
+    registerSlot: (index: number, element: HTMLElement | null) => void;
+}
+
+const PlayerHolderContext = React.createContext({} as PlayerHolderContextType);
 
 // ----------------- INITIAL STATES -----------------
 const initialPlayerHolderState: PlayerHolderState = {
-    holders: Array(8)
+    holders: Array(maxPlayers)
         .fill(null)
         .map((_, index) => ({
             id: index,
@@ -46,7 +55,7 @@ export function usePlayerHolder() {
 export function usePlayerHolderById(id: number) {
     const playerHolder = useContext(PlayerHolderContext);
 
-    const holder = playerHolder.holders.find((holder, index) => index === id);
+    const holder = playerHolder.holders?.[id];
 
     if (!holder) {
         return { id: -1, player: null, isReady: false };
@@ -62,47 +71,33 @@ function PlayerHolderProvider({ children }: { children: React.ReactNode }) {
 
     // ------- YT IFRAME API INIT -------
     const [playerHolder, dispatchPlayerHolder] = useReducer(playerHolderReducer, initialPlayerHolderState);
-    const { windowHeight, windowWidth } = useWindowSize();
+
+    const slotsRef = useRef<(HTMLElement | null)[]>(Array(maxPlayers).fill(null));
+    const playersRef = useRef<(IFPlayer | null)[]>(Array(maxPlayers).fill(null));
+    const [slotsVersion, setSlotsVersion] = useState(0);
+
+    const registerSlot = useCallback((index: number, element: HTMLElement | null) => {
+        if (!Number.isInteger(index) || index < 0 || index >= maxPlayers) return;
+        if (slotsRef.current[index] === element) return;
+
+        slotsRef.current[index] = element;
+        setSlotsVersion(version => version + 1);
+    }, []);
 
     useEffect(() => {
-
         if (typeof window === 'undefined') return;
-        if (playerHolder.firstLoadDone) return;
 
-        let playerHolderTemp = [] as {
-            id: number;
-            player: any;
-            isReady: boolean;
-        }[];
+        const slots = slotsRef.current;
+        // Wait until every PlayerComponent has handed us its wrapper
+        if (slots.some(slot => !slot)) return;
+        // playersRef is a ref rather than state so the guard is accurate immediately,
+        // instead of a render behind
+        if (playersRef.current.some(Boolean)) return;
 
-        const container = document.createElement('div');
-        container.setAttribute('id', 'playerHolder');
-        container.setAttribute('style', 'display: none');
-        document.body.appendChild(container);
-
-        for (let i = 0; i < maxPlayers; i++) {
-            const div = document.createElement('div');
-            div.setAttribute('id', `player${i}`);
-            container.appendChild(div);
-
-            playerHolderTemp.push({
-                id: i,
-                player: div,
-                isReady: false,
-            });
-        }
-
-        const tag = document.createElement('script');
-        tag.src = 'https://www.youtube.com/iframe_api';
-        document.body.appendChild(tag);
+        let cancelled = false;
 
         // paused state: 2, playing state: 1
-        function onPlayerStateChange(e: any) {
-            const player = e.target as IFPlayer;
-            const playerIdx = parseInt(
-                //@ts-ignore
-                player.g.id.charAt(player.g.id.length - 1),
-            );
+        function onPlayerStateChange(playerIdx: number, player: IFPlayer) {
             const changedState = player.getPlayerState();
 
             if (changedState === YT.PlayerState.PAUSED) {
@@ -134,18 +129,17 @@ function PlayerHolderProvider({ children }: { children: React.ReactNode }) {
             }
         }
 
-        function onPlayerReady(e: any) {
-            const player = e.target as IFPlayer;
-            const playerIdx = parseInt(
-                //@ts-ignore
-                player.g.id.charAt(player.g.id.length - 1),
-            );
-
-            player.setVolume(0);
+        function onPlayerReady(playerIdx: number, player: IFPlayer) {
+            // mute() rather than setVolume(0): autoplay policies only exempt genuinely muted
+            // players, and a volume of 0 does not count as muted
+            player.mute();
             player.playVideo();
             setTimeout(() => {
+                if (cancelled) return;
+
                 player.seekTo(0, true);
                 player.pauseVideo();
+                player.unMute();
                 player.setVolume(50);
 
                 dispatchPlayerHolder({
@@ -155,39 +149,52 @@ function PlayerHolderProvider({ children }: { children: React.ReactNode }) {
             }, 500);
         }
 
-        //@ts-ignore
-        window.onYouTubeIframeAPIReady = function() {
-            playerHolderTemp = playerHolderTemp.map(holder => ({
-                ...holder,
-                // @ts-ignore
-                player: new YT.Player(holder.player.id, {
-                    // initialize player with a height of innerHeight / 7.58
-                    // and a width of innerWidth / 7.40
-                    height: windowHeight ? windowHeight / 7.58 : 0,
-                    width: windowWidth ? windowWidth / 7.40 : 0,
+        loadYouTubeApi().then(YTApi => {
+            if (cancelled) return;
+
+            slots.forEach((slot, index) => {
+                // The API replaces the element it is given, so hand it a throwaway child of the
+                // slot. The slot itself is rendered by React and has no JSX children, so React
+                // never reconciles inside it.
+                const target = document.createElement('div');
+                slot!.appendChild(target);
+
+                const player = new YTApi.Player(target, {
+                    width: '100%',
+                    height: '100%',
                     videoId: DEFAULT_VIDEO_ID,
                     playerVars: {
                         fs: 0,
                         enablejsapi: 1,
-                        origin: 'bardicinspiration.cc',
+                        playsinline: 1,
+                        origin: window.location.origin,
                     },
                     events: {
-                        onStateChange: onPlayerStateChange,
-                        onReady: onPlayerReady,
+                        onStateChange: e => onPlayerStateChange(index, e.target as IFPlayer),
+                        onReady: e => onPlayerReady(index, e.target as IFPlayer),
                     },
-                }),
-            }));
+                }) as IFPlayer;
 
-            dispatchPlayerHolder({
-                type: 'init',
-                payload: { holders: playerHolderTemp, firstLoadDone: true },
+                playersRef.current[index] = player;
+
+                // Dispatched per index rather than as one wholesale init, so a setReady that
+                // lands first cannot be overwritten
+                dispatchPlayerHolder({
+                    type: 'setPlayer',
+                    index,
+                    payload: player,
+                });
             });
-        };
+
+            dispatchPlayerHolder({ type: 'setFirstLoadDone' });
+        });
 
         return () => {
-            document.body.removeChild(container);
+            cancelled = true;
+            playersRef.current.forEach(player => player?.destroy?.());
+            playersRef.current = Array(maxPlayers).fill(null);
         };
-    }, [playerHolder.firstLoadDone, windowHeight, windowWidth]);
+    }, [slotsVersion, presetDispatch]);
 
     // ------- LISTENERS -------
 
@@ -203,6 +210,7 @@ function PlayerHolderProvider({ children }: { children: React.ReactNode }) {
         <PlayerHolderContext.Provider value={{
             holders: playerHolder.holders,
             firstLoadDone: playerHolder.firstLoadDone,
+            registerSlot,
         }}>
             {children}
         </PlayerHolderContext.Provider>

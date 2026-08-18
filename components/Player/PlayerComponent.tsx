@@ -4,12 +4,20 @@ import { fadeIn, fadeInputHandler, fadeOut } from './fadeFunctions';
 import { loadNewVideo } from '../utils/utils';
 import { usePlayerControls } from './Contexts/PlayerControlsProvider';
 import { useStackControls } from '../Contexts/StackControlsProvider';
-import React, { useState } from 'react';
+import { usePlayerHolder } from '../Contexts/PlayerHolderProvider';
+import React, { useCallback, useState } from 'react';
 
 function PlayerComponent() {
     const { selected, setSelected, playerId, localVolume, setLocalVolume } = usePlayerControls();
+    const { registerSlot } = usePlayerHolder();
     const [showSettings, setShowSettings] = useState(false); // Toggle for Video ID
-    const ID = `player${playerId}`;
+
+    // The provider builds the iframe inside this wrapper. It must stay childless in JSX so React
+    // never reconciles into a subtree the YouTube API owns.
+    const slotRef = useCallback(
+        (element: HTMLDivElement | null) => registerSlot(playerId, element),
+        [registerSlot, playerId],
+    );
 
     return (
         <motion.div
@@ -44,7 +52,10 @@ function PlayerComponent() {
 
             {/* Left Side: Video & Status */}
             <div className="relative w-1/2 h-full bg-black">
-                <div className="h-full w-full opacity-80" id={ID} />
+                <div
+                    ref={slotRef}
+                    className="absolute inset-0 opacity-80 [&>iframe]:absolute [&>iframe]:inset-0 [&>iframe]:h-full [&>iframe]:w-full"
+                />
 
                 <AnimatePresence>
                     {showSettings && (
