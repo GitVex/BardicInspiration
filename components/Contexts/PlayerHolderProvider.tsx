@@ -4,7 +4,7 @@ import { playerHolderReducer, PlayerHolderState } from './states';
 import { usePreset } from '../Player/Contexts/PresetProvider';
 import { loadYouTubeApi } from '../Player/ytApiLoader';
 
-import { DEFAULT_PLAYER_COUNT, DEFAULT_VIDEO_ID } from '../utils/DEFAULTS';
+import { DEFAULT_PLAYER_COUNT, DEFAULT_VIDEO_ID, DEFAULT_VOLUME } from '../utils/DEFAULTS';
 
 // YT.PlayerState.UNSTARTED = -1;
 // YT.PlayerState.ENDED = 0;
@@ -139,23 +139,16 @@ function PlayerHolderProvider({ children, playerCount = DEFAULT_PLAYER_COUNT }: 
         }
 
         function onPlayerReady(playerIdx: number, player: IFPlayer) {
-            // mute() rather than setVolume(0): autoplay policies only exempt genuinely muted
-            // players, and a volume of 0 does not count as muted
-            player.mute();
-            player.playVideo();
-            setTimeout(() => {
-                if (cancelled) return;
+            // No play-then-pause priming. Starting playback and pausing it on a timer races the
+            // video's own load: when the pause lands before the first frame is painted, the iframe
+            // is left black with no controls, and only playing it again brings it back. The video
+            // is cued at construction, so it already shows its poster and controls - leave it be.
+            player.setVolume(DEFAULT_VOLUME);
 
-                player.seekTo(0, true);
-                player.pauseVideo();
-                player.unMute();
-                player.setVolume(50);
-
-                dispatchPlayerHolder({
-                    type: 'setReady',
-                    index: playerIdx,
-                });
-            }, 500);
+            dispatchPlayerHolder({
+                type: 'setReady',
+                index: playerIdx,
+            });
         }
 
         loadYouTubeApi().then(YTApi => {

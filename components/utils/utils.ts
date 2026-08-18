@@ -63,18 +63,15 @@ export function loadNewVideo(
     if (!target) return;
 
     framePlayer.setVolume(volume ?? framePlayer.getVolume());
-    framePlayer.loadVideoById(target);
-    framePlayer.pauseVideo();
+
+    // cueVideoById, not loadVideoById: loading starts playback, and pausing it before the first
+    // frame is painted leaves the iframe black with no controls until something plays it again.
+    // Cueing lands directly in the state we actually want - poster shown, positioned at 0, silent.
+    framePlayer.cueVideoById(target);
 
     dispatch({
         type: 'setId',
         index: playerId,
         payload: target,
     });
-
-    setTimeout(() => {
-        framePlayer.pauseVideo();
-        framePlayer.seekTo(0, true);
-        framePlayer.setLoop(true);
-    }, 1000);
 }
