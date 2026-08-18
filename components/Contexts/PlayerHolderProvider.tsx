@@ -4,9 +4,7 @@ import { playerHolderReducer, PlayerHolderState } from './states';
 import { usePreset } from '../Player/Contexts/PresetProvider';
 import { loadYouTubeApi } from '../Player/ytApiLoader';
 
-import { DEFAULT_VIDEO_ID } from '../utils/DEFAULTS';
-
-const maxPlayers = 8;
+import { DEFAULT_PLAYER_COUNT, DEFAULT_VIDEO_ID } from '../utils/DEFAULTS';
 
 // YT.PlayerState.UNSTARTED = -1;
 // YT.PlayerState.ENDED = 0;
@@ -32,16 +30,18 @@ interface PlayerHolderContextType extends PlayerHolderState {
 const PlayerHolderContext = React.createContext({} as PlayerHolderContextType);
 
 // ----------------- INITIAL STATES -----------------
-const initialPlayerHolderState: PlayerHolderState = {
-    holders: Array(maxPlayers)
-        .fill(null)
-        .map((_, index) => ({
-            id: index,
-            player: null,
-            isReady: false,
-        })),
-    firstLoadDone: false,
-};
+function createInitialPlayerHolderState(playerCount: number): PlayerHolderState {
+    return {
+        holders: Array(playerCount)
+            .fill(null)
+            .map((_, index) => ({
+                id: index,
+                player: null,
+                isReady: false,
+            })),
+        firstLoadDone: false,
+    };
+}
 
 // ----------------- HOOKS -----------------
 export function usePlayerHolder() {
@@ -65,19 +65,28 @@ export function usePlayerHolderById(id: number) {
 }
 
 // ----------------- PROVIDER -----------------
-function PlayerHolderProvider({ children }: { children: React.ReactNode }) {
+// playerCount is read once, on mount - changing it afterwards is not supported. It exists so the
+// /test sandbox can mount a single player without waiting on eight slots that never appear.
+function PlayerHolderProvider({ children, playerCount = DEFAULT_PLAYER_COUNT }: {
+    children: React.ReactNode;
+    playerCount?: number;
+}) {
 
     const { presetDispatch } = usePreset();
 
     // ------- YT IFRAME API INIT -------
-    const [playerHolder, dispatchPlayerHolder] = useReducer(playerHolderReducer, initialPlayerHolderState);
+    const [playerHolder, dispatchPlayerHolder] = useReducer(
+        playerHolderReducer,
+        playerCount,
+        createInitialPlayerHolderState,
+    );
 
-    const slotsRef = useRef<(HTMLElement | null)[]>(Array(maxPlayers).fill(null));
-    const playersRef = useRef<(IFPlayer | null)[]>(Array(maxPlayers).fill(null));
+    const slotsRef = useRef<(HTMLElement | null)[]>(Array(playerCount).fill(null));
+    const playersRef = useRef<(IFPlayer | null)[]>(Array(playerCount).fill(null));
     const [slotsVersion, setSlotsVersion] = useState(0);
 
     const registerSlot = useCallback((index: number, element: HTMLElement | null) => {
-        if (!Number.isInteger(index) || index < 0 || index >= maxPlayers) return;
+        if (!Number.isInteger(index) || index < 0 || index >= slotsRef.current.length) return;
         if (slotsRef.current[index] === element) return;
 
         slotsRef.current[index] = element;
@@ -192,9 +201,9 @@ function PlayerHolderProvider({ children }: { children: React.ReactNode }) {
         return () => {
             cancelled = true;
             playersRef.current.forEach(player => player?.destroy?.());
-            playersRef.current = Array(maxPlayers).fill(null);
+            playersRef.current = Array(playerCount).fill(null);
         };
-    }, [slotsVersion, presetDispatch]);
+    }, [slotsVersion, presetDispatch, playerCount]);
 
     // ------- LISTENERS -------
 

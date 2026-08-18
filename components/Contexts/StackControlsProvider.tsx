@@ -10,18 +10,18 @@ import {
     LocalVolumesState,
 } from '../Player/types/states';
 import { PlayerStateAction, PresetState } from '../Player/Contexts/states';
-import { DEFAULT_VOLUME, GLOBAL_DISABLE_SAVE_PRESET } from '../utils/DEFAULTS';
+import { DEFAULT_PLAYER_COUNT, DEFAULT_VOLUME, GLOBAL_DISABLE_SAVE_PRESET } from '../utils/DEFAULTS';
 import { clearPreset, loadPreset, savePreset } from './utils/presetlocalStorageUtils';
 import { loadPersistPresetPref, savePersistPresetPref } from './utils/persistenceLocalStorageUtils';
 import { usePreset } from '../Player/Contexts/PresetProvider';
 
-const initialFadeAnimations: FadeAnimationsState = {
-    fadeAnimationHandles: Array(9).fill(null),
-};
+const createInitialFadeAnimations = (playerCount: number): FadeAnimationsState => ({
+    fadeAnimationHandles: Array(playerCount).fill(null),
+});
 
-const initialVolumes: LocalVolumesState = {
-    volume: Array(8).fill(DEFAULT_VOLUME),
-};
+const createInitialVolumes = (playerCount: number): LocalVolumesState => ({
+    volume: Array(playerCount).fill(DEFAULT_VOLUME),
+});
 
 interface StackControlsProviderType {
     presetState: PresetState;
@@ -42,15 +42,23 @@ interface StackControlsProviderType {
 
 const StackControlsContext = createContext<StackControlsProviderType | null>(null);
 
-export const StackControlsProvider = ({ children }: { children: ReactNode }) => {
+// playerCount must match the PresetProvider/PlayerHolderProvider it sits between.
+export const StackControlsProvider = ({ children, playerCount = DEFAULT_PLAYER_COUNT }: {
+    children: ReactNode;
+    playerCount?: number;
+}) => {
     const { presetState, presetDispatch } = usePreset();
 
     const debouncedPresetDispatch = useDebounceCallback(presetDispatch, 1000);
 
-    const [localVolumes, localVolumesDispatch] = useReducer(localVolumesReducer, initialVolumes);
+    const [localVolumes, localVolumesDispatch] = useReducer(localVolumesReducer, playerCount, createInitialVolumes);
     const [masterVolume, setMasterVolume] = useState(presetState.masterVolume);
     const [masterVolumeModifier, setMasterVolumeModifier] = useState(presetState.masterVolume / 100);
-    const [fadeAnimations, fadeAnimationsDispatch] = useReducer(fadeAnimationsReducer, initialFadeAnimations);
+    const [fadeAnimations, fadeAnimationsDispatch] = useReducer(
+        fadeAnimationsReducer,
+        playerCount,
+        createInitialFadeAnimations,
+    );
     const [disablePersistPreset, setDisablePersistPreset] = useState(GLOBAL_DISABLE_SAVE_PRESET);
 
 
@@ -69,9 +77,20 @@ export const StackControlsProvider = ({ children }: { children: ReactNode }) => 
 
     // ------- PRESET STATE PERSISTENCE -------
     useEffect(() => {
+        const saved = loadPreset(presetState);
+
+        // A preset saved with a different number of players would resize presetState.players out
+        // from under the providers, leaving dispatches pointed at indices that no longer exist
+        if (saved.players?.length !== presetState.players.length) {
+            console.warn(
+                `Ignoring saved preset: it has ${saved.players?.length} players, this session has ${presetState.players.length}`,
+            );
+            return;
+        }
+
         presetDispatch({
             type: 'setPreset',
-            payload: loadPreset(presetState),
+            payload: saved,
         });
     }, []);
 
