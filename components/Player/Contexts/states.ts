@@ -71,6 +71,11 @@ interface SetPresetAction {
 
 export const playerStateReducer = (state: PresetState, action: PlayerStateAction): PresetState => {
     function updatePlayerAtIndex(players: PlayerState[], index: number, update: Partial<PlayerState>): PlayerState[] {
+        if (!isValidIndex(index, players.length)) {
+            console.error(`Invalid index ${index} for players array of length ${players.length}`);
+            return players;
+        }
+
         return [
             ...players.slice(0, index), // Keep players before the updated one
             { ...players[index], ...update }, // Update the player at the specified index
@@ -126,3 +131,6 @@ export const playerStateReducer = (state: PresetState, action: PlayerStateAction
     }
 };
 
+function isValidIndex(index: number, length: number) {
+    return Number.isInteger(index) && index >= 0 && index < length;
+}
