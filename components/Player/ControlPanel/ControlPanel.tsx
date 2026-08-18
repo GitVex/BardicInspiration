@@ -9,7 +9,7 @@ function ControlPanel() {
     const onLoaded = () => setInitialLoadDone(true);
 
     return (
-        <div className="flex h-full w-1/3 flex-col items-center justify-center gap-2">
+        <div className="flex h-full w-1/3 min-h-0 shrink-0 flex-col items-center justify-center gap-2">
             <SelectionsViewer />
             <GroupFadeControl initialLoadDone={initialLoadDone} />
             <PersistenceControls initialLoadDone={initialLoadDone} />

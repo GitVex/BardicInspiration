@@ -22,7 +22,7 @@ function PlayerComponent() {
     return (
         <motion.div
             // Use 'group' to handle hover effects
-            className="group relative flex flex-row h-full overflow-hidden rounded-xl border border-white/10 bg-gray-900 shadow-xl"
+            className="group relative flex h-full w-full min-h-0 min-w-0 flex-row overflow-hidden rounded-xl border border-white/10 bg-gray-900 shadow-xl"
             animate={{
                 // Subtle glow instead of harsh red border
                 borderColor: selected ? 'rgba(239, 68, 68, 0.8)' : 'rgba(255, 255, 255, 0.1)',
@@ -37,24 +37,25 @@ function PlayerComponent() {
                 className="absolute top-1 right-1 z-20 rounded-full bg-black/50 p-1.5 text-xs text-white hover:bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"
             >
                 {showSettings ?
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5"
                          stroke="currentColor" className="size-4">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
                     </svg>
                     :
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5"
                          stroke="currentColor" className="size-4">
-                        <path stroke-linecap="round" stroke-linejoin="round"
+                        <path strokeLinecap="round" strokeLinejoin="round"
                               d="m19.5 4.5-15 15m0 0h11.25m-11.25 0V8.25" />
                     </svg>
                 }
             </button>
 
-            {/* Left Side: Video & Status */}
-            <div className="relative w-1/2 h-full bg-black">
+            {/* Left Side: Video & Status. The slot declares 16:9 and takes its size from the card
+                height, rather than inheriting whatever shape the controls happen to leave over. */}
+            <div className="relative flex h-full w-1/2 shrink-0 items-center justify-center bg-black">
                 <div
                     ref={slotRef}
-                    className="absolute inset-0 opacity-80 [&>iframe]:absolute [&>iframe]:inset-0 [&>iframe]:h-full [&>iframe]:w-full"
+                    className="relative aspect-video w-full max-h-full opacity-80 [&>iframe]:absolute [&>iframe]:inset-0 [&>iframe]:h-full [&>iframe]:w-full"
                 />
 
                 <AnimatePresence>
@@ -74,8 +75,8 @@ function PlayerComponent() {
             </div>
 
             {/* Right Side: Mixing Controls */}
-            <div className="flex w-1/2 flex-row p-2 gap-2 bg-gray-800/50">
-                <div className="h-full w-1/2 flex flex-col items-center justify-center py-2">
+            <div className="flex min-w-0 flex-1 flex-row gap-2 bg-gray-800/50 p-2">
+                <div className="flex min-h-0 w-1/2 flex-col items-center justify-center py-2">
                     <VolumeSlider
                         volumeControl={{ localVolume, setLocalVolume }}
                         height={'100%'}
@@ -142,10 +143,10 @@ function FadeInButton() {
         }}
         disabled={!framePlayer}
     >
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"
              className="size-6">
-            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 18.75 7.5-7.5 7.5 7.5" />
-            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 7.5-7.5 7.5 7.5" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 18.75 7.5-7.5 7.5 7.5" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 7.5-7.5 7.5 7.5" />
         </svg>
 
     </button>;
@@ -202,9 +203,9 @@ function FadeOutButton() {
         }}
         disabled={!framePlayer}
     >
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"
              className="size-6">
-            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 5.25 7.5 7.5 7.5-7.5m-15 6 7.5 7.5 7.5-7.5" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 5.25 7.5 7.5 7.5-7.5m-15 6 7.5 7.5 7.5-7.5" />
         </svg>
 
     </button>;
