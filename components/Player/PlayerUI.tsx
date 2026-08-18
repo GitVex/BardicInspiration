@@ -14,7 +14,7 @@ function PlayerUI() {
 
     return (
         <div className="flex h-full w-full flex-row items-stretch justify-center gap-4 p-4 backdrop-blur-md">
-            <div className="flex min-h-0 min-w-0 flex-1 flex-row items-stretch gap-4">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-row items-stretch gap-4 py-16">
                 <div className="grid min-h-0 min-w-0 flex-1 grid-cols-2 grid-rows-4 gap-2">
                     {Array.from({ length: DEFAULT_PLAYER_COUNT }, (_, id) => id).map(id => (
                         <PlayerControlsProvider playerId={id} key={id}>
