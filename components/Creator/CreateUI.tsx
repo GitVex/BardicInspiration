@@ -8,7 +8,7 @@ import useFormSubmit from './hooks/useFormSubmit';
 function CreateUI() {
     const { url, focussedVideo, isPresent, fetchAndSetVideoInfo } = useVideoInfo();
     const { tags, setTagsFromInput } = useTags();
-    const { isSubmittable, isLoading, handleSubmit } = useFormSubmit(url, tags, focussedVideo, isPresent);
+    const { isSubmittable, isLoading, submitError, handleSubmit } = useFormSubmit(url, tags, focussedVideo, isPresent);
 
     const onBlurUrlFieldHandler = async (e: React.FocusEvent<HTMLInputElement>) => {
         const url = e.target.value;
@@ -57,6 +57,11 @@ function CreateUI() {
                             Submit
                         </motion.button>
                         <Affirmator isLoading={isLoading} />
+                        {submitError && (
+                            <span className="w-full break-words text-center text-sm text-red-600">
+                                {submitError}
+                            </span>
+                        )}
                     </form>
                 </div>
             </section>
