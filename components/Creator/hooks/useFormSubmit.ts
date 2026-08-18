@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { IVideoData } from '../types/IVideoData';
 import { validateUrl } from './utils';
-import { useNewItems } from '../../Viewer/hooks/useNewItems';
+import { useInvalidateNewItems } from '../../Viewer/hooks/useNewItems';
 
 const useFormSubmit = (url: string, tags: string, focussedVideo: IVideoData | null, isPresent: boolean) => {
     const [isSubmittable, setIsSubmittable] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    const { invalidateNewItemsCache } = useNewItems();
+    // Not useNewItems(): reaching the helper through it mounted a second paginated subscription,
+    // at the default page size rather than the 30 the list renders with
+    const invalidateNewItems = useInvalidateNewItems();
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -30,7 +32,7 @@ const useFormSubmit = (url: string, tags: string, focussedVideo: IVideoData | nu
                 }),
             });
 
-            invalidateNewItemsCache();
+            await invalidateNewItems();
         } catch (error) {
             console.error('Failed to submit:', error);
         } finally {
