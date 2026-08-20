@@ -1,30 +1,18 @@
 // useNewItems.ts
 import { useCallback } from 'react';
-import useSWRInfinite from 'swr/infinite';
 import { useSWRConfig } from 'swr';
-import { fetcher } from './fetcher';
-import TPage from '../types/TPage';
+import { usePaginatedItems } from './usePaginatedItems';
 
 export const NEW_ITEMS_ROUTE = '/api/viewer/new';
 
 export function useNewItems(pageSize: number = 10) {
-    const getKey = (pageIndex: number, previousPageData: TPage | null) => {
-        if (previousPageData && !previousPageData.data.length) return null;
-        return `${NEW_ITEMS_ROUTE}?page=${pageIndex}&pageSize=${pageSize}`;
-    };
-
-    const { data, error, size, setSize } = useSWRInfinite<TPage, Error>(getKey, fetcher, {
-        revalidateOnFocus: false,
+    return usePaginatedItems({
+        buildKey: pageIndex => `${NEW_ITEMS_ROUTE}?page=${pageIndex}&pageSize=${pageSize}`,
         // A new track is ordered to the top, which shifts every following row by one. Revalidating
         // only the first page would leave the item straddling the page boundary duplicated.
         revalidateAll: true,
         refreshInterval: 1000 * 60 * 2,
     });
-
-    const items = data ? data.flatMap(page => page.data) : [];
-    const isLoadingMore = data && typeof data[size - 1] === 'undefined';
-
-    return { items, isError: error, isLoading: !error && !data, isLoadingMore, setSize, size };
 }
 
 /**

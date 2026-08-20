@@ -1,31 +1,19 @@
 // useFilterItems.ts
-import useSWRInfinite from 'swr/infinite';
 import { fetcher } from './fetcher';
 import { useFilter } from '../../Contexts/FilterStateProvider';
-import TPage from '../types/TPage';
+import { usePaginatedItems } from './usePaginatedItems';
 
 export function useFilterItems(pageSize: number = 10) {
     const { filter } = useFilter();
 
-    const getKey = (pageIndex: number, previousPageData: TPage | null) => {
-        if (previousPageData && !previousPageData.data.length) return null;
-
-        const route = `/api/viewer/filter?page=${pageIndex}&pageSize=${pageSize}`;
-
-        return [route, filter];
-    };
-
-    const { data, error, size, setSize } = useSWRInfinite<TPage, Error>(
-        getKey,
-        (url) => fetcher(url, { filter }),
-        {
-            revalidateOnFocus: false,
-            refreshInterval: 1000 * 60 * 10,
-        },
-    );
-
-    const items = data ? data.flatMap(page => page.data) : [];
-    const isLoadingMore = data && typeof data[size - 1] === 'undefined';
-
-    return { items, isError: error, isLoading: !error && !data, isLoadingMore, setSize, size };
+    return usePaginatedItems({
+        // The filter travels in the POST body, so it has to be part of the cache key too -
+        // otherwise every filter would share one cache entry.
+        buildKey: pageIndex => [`/api/viewer/filter?page=${pageIndex}&pageSize=${pageSize}`, filter],
+        // SWR v2 hands the fetcher the whole key as ONE argument rather than spreading it, so the
+        // url has to be destructured out. Passing the array straight to fetch() stringifies it
+        // into "/api/viewer/filter?...,tagA,tagB", which is not a route that exists.
+        fetchPage: ([url]: [string, string[]]) => fetcher(url, { filter }),
+        refreshInterval: 1000 * 60 * 10,
+    });
 }

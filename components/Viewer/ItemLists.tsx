@@ -1,43 +1,33 @@
+import { Virtuoso } from 'react-virtuoso';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useNewItems } from './hooks/useNewItems';
 import { useFilterItems } from './hooks/useFilterItems';
 import { useListItems } from './hooks/useListItems';
-import { Virtuoso } from 'react-virtuoso';
+import { PaginatedItems } from './hooks/usePaginatedItems';
 import ListItem from './ListItem';
-import { AnimatePresence, motion } from 'framer-motion';
 import LoadingAnim from '../utils/LoadingAnimDismount';
-import TItem from './types/TItem';
-import TPage from './types/TPage';
 
 interface IItemsListProps {
-    search?: string;
-    hook: {
-        items: TItem[];
-        isLoading: boolean;
-        isError: any;
-        isLoadingMore: boolean | undefined;
-        setSize: (size: number | ((_size: number) => number)) => Promise<TPage[] | undefined>;
-        size: number;
-    };
+    hook: PaginatedItems;
 }
 
-export function ItemsList(props: IItemsListProps) {
-    const {
-        items,
-        isLoading,
-        isError,
-        isLoadingMore,
-        setSize,
-        size,
-    } = props.hook;
+const Loader = () => (
+    <motion.div key="loader" className="self-center">
+        <LoadingAnim />
+    </motion.div>
+);
+
+/**
+ * Renders any paginated list. Every list in the Viewer - new, filter, search and the plain list -
+ * is this component fed a different hook.
+ */
+export function ItemsList({ hook }: IItemsListProps) {
+    const { items, isLoading, isError, isLoadingMore, setSize, size } = hook;
 
     return (
         <AnimatePresence mode="wait">
             {isError && (<p>Error: {isError.message}</p>)}
-            {isLoading && (
-                <motion.div key="loader" className="self-center">
-                    <LoadingAnim />
-                </motion.div>
-            )}
+            {isLoading && <Loader />}
             {items && (
                 <Virtuoso
                     data={items}
@@ -50,19 +40,11 @@ export function ItemsList(props: IItemsListProps) {
                     }}
                     endReached={() => {
                         if (!isLoadingMore) {
-                            setSize(size + 1).then(r => console.log(r, size));
+                            setSize(size + 1);
                         }
                     }}
                     components={{
-                        Footer: () => (
-                            <div>
-                                {isLoadingMore ? (
-                                    <motion.div key="loader" className="self-center">
-                                        <LoadingAnim />
-                                    </motion.div>
-                                ) : ''}
-                            </div>
-                        ),
+                        Footer: () => <div>{isLoadingMore ? <Loader /> : null}</div>,
                     }}
                 />
             )}
@@ -71,69 +53,13 @@ export function ItemsList(props: IItemsListProps) {
 }
 
 export function NewItemsList() {
-    return (
-        <ItemsList hook={useNewItems(30)} />
-    );
+    return <ItemsList hook={useNewItems(30)} />;
 }
 
 export function FilterItemsList() {
-    return (
-        <ItemsList hook={useFilterItems(30)} />
-    );
+    return <ItemsList hook={useFilterItems(30)} />;
 }
 
 export function ListItems() {
-    return (
-        <ItemsList hook={useListItems(30)} />
-    );
-}
-
-export function SearchItemsList(props: IItemsListProps) {
-    const {
-        items,
-        isLoading,
-        isError,
-        isLoadingMore,
-        setSize,
-        size,
-    } = props.hook;
-
-    return (
-        <AnimatePresence mode="wait">
-            {isError && (<p>Error: {isError.message}</p>)}
-            {isLoading && (
-                <motion.div key="loader" className="self-center">
-                    <LoadingAnim />
-                </motion.div>
-            )}
-            {items && (
-                <Virtuoso
-                    data={items}
-                    itemContent={(_, item) => <ListItem item={item} />}
-                    style={{ height: '100%', width: '100%' }}
-                    onKeyDown={(e) => {
-                        if (e.key === ' ') {
-                            e.preventDefault();
-                        }
-                    }}
-                    endReached={() => {
-                        if (!isLoadingMore) {
-                            setSize(size + 1).then(r => console.log(r, size));
-                        }
-                    }}
-                    components={{
-                        Footer: () => (
-                            <div>
-                                {isLoadingMore ? (
-                                    <motion.div key="loader" className="self-center">
-                                        <LoadingAnim />
-                                    </motion.div>
-                                ) : ''}
-                            </div>
-                        ),
-                    }}
-                />
-            )}
-        </AnimatePresence>
-    );
+    return <ItemsList hook={useListItems(30)} />;
 }
