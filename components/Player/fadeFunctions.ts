@@ -10,6 +10,8 @@ export interface FadeOptions {
     pLimit?: number;
     inverse?: boolean;
     sync?: boolean;
+    /** Per-player override for the volume-proportional default duration. */
+    durationMs?: number | null;
     savedVolumeControl?: {
         savedVolume: { hasSaved: boolean; prevVol: number };
         setSavedVolume: (savedVolume: { hasSaved: boolean; prevVol: number }) => void;
@@ -23,6 +25,7 @@ function fade({
                   pLimit,
                   sync = false,
                   inverse = false,
+                  durationMs,
                   savedVolumeControl,
               }: FadeOptions) {
     if (!framePlayer) return;
@@ -72,7 +75,9 @@ function fade({
 
     let currentVolume = startVolume;
     const volumeChange = endVolume - startVolume;
-    const duration = sync ? 4000 : DEFAULT_FADE_DURATION(volumeChange);
+    // A group fade stays locked to 4s so the players land together; otherwise the player's own
+    // setting wins, falling back to the volume-proportional default.
+    const duration = sync ? 4000 : durationMs ?? DEFAULT_FADE_DURATION(volumeChange);
     const startTime = performance.now();
 
     const easeFunc = inverse ? (t: number) => 1 - DEFAULT_EASE(1 - t) : DEFAULT_EASE;
@@ -104,7 +109,7 @@ export function fadeOut(options: FadeOptions) {
     fade({ ...options, inverse: true });
 }
 
-export function fadeTo({ framePlayer, localVolumeControl, fadeAnimationControl, pLimit = 50 }: FadeOptions) {
+export function fadeTo({ framePlayer, localVolumeControl, fadeAnimationControl, pLimit = 50, durationMs }: FadeOptions) {
     if (!framePlayer) return;
 
     const { localVolume: volume, setLocalVolume: setVolume } = localVolumeControl;
@@ -119,7 +124,7 @@ export function fadeTo({ framePlayer, localVolumeControl, fadeAnimationControl, 
     const startVolume = volume;
     const endVolume = pLimit;
     const volumeChange = endVolume - startVolume;
-    const duration = DEFAULT_FADE_DURATION(volumeChange);
+    const duration = durationMs ?? DEFAULT_FADE_DURATION(volumeChange);
     const startTime = performance.now();
 
     console.log('Breakpoint 1', startVolume);

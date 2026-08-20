@@ -8,6 +8,7 @@ import { SavedVolume } from '../types/states';
 interface PlayerControlsProviderType {
     playerId: number;
     framePlayer: IFPlayer | null;
+    videoId: string | undefined;
     selected: boolean;
     setSelected: () => void;
     localVolume: number;
@@ -16,6 +17,11 @@ interface PlayerControlsProviderType {
     setSavedVolume: (vol: SavedVolume) => void;
     fadeAnimationHandle: number | null;
     setFadeAnimationHandle: (animID: number | null) => void;
+    startSeconds: number;
+    endSeconds: number | null;
+    setOffsets: (offsets: { startSeconds: number; endSeconds: number | null }) => void;
+    fadeDurationMs: number | null;
+    setFadeDuration: (durationMs: number | null) => void;
 }
 
 const PlayerControlsContext = createContext<PlayerControlsProviderType | null>(null);
@@ -32,7 +38,12 @@ interface PlayerControlsProviderProps {
  */
 export const PlayerControlsProvider = ({ children, playerId }: PlayerControlsProviderProps) => {
     const { presetState, localVolumes, masterVolumeModifier, fadeAnimations } = useStackState();
-    const { debouncedPresetDispatch, localVolumesDispatch, fadeAnimationsDispatch } = useStackActions();
+    const {
+        presetDispatch,
+        debouncedPresetDispatch,
+        localVolumesDispatch,
+        fadeAnimationsDispatch,
+    } = useStackActions();
 
     const framePlayer = usePlayerHolderById(playerId).player as IFPlayer;
 
@@ -40,6 +51,7 @@ export const PlayerControlsProvider = ({ children, playerId }: PlayerControlsPro
 
     const playerInPreset = presetState.players[playerId];
     const selected = playerInPreset?.selected ?? false;
+    const videoId = playerInPreset?.videoId;
     const localVolume = localVolumes.volume[playerId];
     const fadeAnimationHandle = fadeAnimations.fadeAnimationHandles[playerId];
 
@@ -51,6 +63,23 @@ export const PlayerControlsProvider = ({ children, playerId }: PlayerControlsPro
                 payload: animId,
             }),
         [fadeAnimationsDispatch, playerId],
+    );
+
+    const startSeconds = playerInPreset?.startSeconds ?? 0;
+    const endSeconds = playerInPreset?.endSeconds ?? null;
+    const fadeDurationMs = playerInPreset?.fadeDurationMs ?? null;
+
+    // Not debounced: these commit on an explicit button press, not on every keystroke
+    const setOffsets = useCallback(
+        (offsets: { startSeconds: number; endSeconds: number | null }) =>
+            presetDispatch({ type: 'setOffsets', index: playerId, payload: offsets }),
+        [presetDispatch, playerId],
+    );
+
+    const setFadeDuration = useCallback(
+        (durationMs: number | null) =>
+            presetDispatch({ type: 'setFadeDuration', index: playerId, payload: durationMs }),
+        [presetDispatch, playerId],
     );
 
     const setSelected = useCallback(
@@ -91,6 +120,7 @@ export const PlayerControlsProvider = ({ children, playerId }: PlayerControlsPro
         () => ({
             playerId,
             framePlayer,
+            videoId,
             selected,
             setSelected,
             localVolume,
@@ -99,10 +129,16 @@ export const PlayerControlsProvider = ({ children, playerId }: PlayerControlsPro
             setSavedVolume,
             fadeAnimationHandle,
             setFadeAnimationHandle,
+            startSeconds,
+            endSeconds,
+            setOffsets,
+            fadeDurationMs,
+            setFadeDuration,
         }),
         [
             playerId,
             framePlayer,
+            videoId,
             selected,
             setSelected,
             localVolume,
@@ -110,6 +146,11 @@ export const PlayerControlsProvider = ({ children, playerId }: PlayerControlsPro
             savedVolume,
             fadeAnimationHandle,
             setFadeAnimationHandle,
+            startSeconds,
+            endSeconds,
+            setOffsets,
+            fadeDurationMs,
+            setFadeDuration,
         ],
     );
 
