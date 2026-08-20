@@ -3,7 +3,7 @@ import VolumeSlider from './VolumeSlider';
 import { fadeIn, fadeInputHandler, fadeOut } from './fadeFunctions';
 import { loadNewVideo } from '../utils/utils';
 import { usePlayerControls } from './Contexts/PlayerControlsProvider';
-import { useStackControls } from '../Contexts/StackControlsProvider';
+import { useStackActions, useStackState } from '../Contexts/StackControlsProvider';
 import { usePlayerHolder } from '../Contexts/PlayerHolderProvider';
 import React, { useCallback, useState } from 'react';
 
@@ -98,7 +98,8 @@ export default PlayerComponent;
 
 function LoadVideoInput() {
     const { playerId, framePlayer, localVolume } = usePlayerControls();
-    const { debouncedPresetDispatch, masterVolumeModifier } = useStackControls();
+    const { masterVolumeModifier } = useStackState();
+    const { debouncedPresetDispatch } = useStackActions();
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key !== 'Enter') return;

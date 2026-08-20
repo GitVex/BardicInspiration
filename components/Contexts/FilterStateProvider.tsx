@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, ReactNode, useContext, useMemo, useState } from 'react';
 
 type FilterStateContextType = {
     filter: string[];
@@ -10,7 +10,7 @@ const FilterStateContext = createContext<FilterStateContextType | undefined>(und
 export function useFilter() {
     const context = useContext(FilterStateContext);
     if (!context) {
-        throw new Error('useFilterState must be used within a FilterStateProvider');
+        throw new Error('useFilter must be used within a FilterStateProvider');
     }
     return context;
 }
@@ -18,7 +18,8 @@ export function useFilter() {
 function FilterStateProvider({ children }: { children: ReactNode }) {
     const [filter, setFilter] = useState<string[]>([]);
 
-    const value = { filter, setFilter };
+    // setFilter is stable, so this changes only when the filter itself does
+    const value = useMemo(() => ({ filter, setFilter }), [filter]);
 
     return (
         <FilterStateContext.Provider value={value}>

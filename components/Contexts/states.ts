@@ -2,11 +2,15 @@ import IFPlayer from '../Player/types/IFPlayer';
 
 // ------------------- PLAYER HOLDER REDUCER -------------------
 
+/** One slot in the stack: the YouTube player built into it, and whether it has reported ready. */
+export interface PlayerHolder {
+    id: number;
+    player: IFPlayer | null;
+    isReady: boolean;
+}
+
 export interface PlayerHolderState {
-    holders: {
-        player: IFPlayer | null;
-        isReady: boolean
-    }[],
+    holders: PlayerHolder[];
     firstLoadDone: boolean;
 }
 
@@ -32,25 +36,35 @@ interface SetFirstLoadDoneAction {
     type: 'setFirstLoadDone';
 }
 
+/** Replaces one holder, leaving its siblings' identities untouched. */
+function updateHolderAtIndex(
+    holders: PlayerHolder[],
+    index: number,
+    update: Partial<PlayerHolder>,
+): PlayerHolder[] {
+    if (!Number.isInteger(index) || index < 0 || index >= holders.length) {
+        console.error(`Invalid index ${index} for holders array of length ${holders.length}`);
+        return holders;
+    }
+
+    return [
+        ...holders.slice(0, index),
+        { ...holders[index], ...update },
+        ...holders.slice(index + 1),
+    ];
+}
+
 export const playerHolderReducer = (state: PlayerHolderState, action: PlayerHolderAction): PlayerHolderState => {
     switch (action.type) {
         case 'setPlayer':
             return {
                 ...state,
-                holders: [
-                    ...state.holders.slice(0, action.index), // Keep holders before the updated one
-                    { player: action.payload, isReady: state.holders[action.index].isReady }, // Update the holder at the specified index
-                    ...state.holders.slice(action.index + 1), // Keep holders after the updated one
-                ],
+                holders: updateHolderAtIndex(state.holders, action.index, { player: action.payload }),
             };
         case 'setReady':
             return {
                 ...state,
-                holders: [
-                    ...state.holders.slice(0, action.index), // Keep holders before the updated one
-                    { player: state.holders[action.index].player, isReady: true }, // Update the holder at the specified index
-                    ...state.holders.slice(action.index + 1), // Keep holders after the updated one
-                ],
+                holders: updateHolderAtIndex(state.holders, action.index, { isReady: true }),
             };
         case 'init':
             return action.payload;
@@ -60,6 +74,6 @@ export const playerHolderReducer = (state: PlayerHolderState, action: PlayerHold
                 firstLoadDone: true,
             };
         default:
-            throw new Error();
+            throw new Error(`Unhandled action type: ${(action as PlayerHolderAction).type}`);
     }
 };
