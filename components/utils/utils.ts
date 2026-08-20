@@ -55,7 +55,8 @@ export function loadNewVideo(
     dispatch: React.Dispatch<PlayerStateAction>,
     framePlayer: IFPlayer,
     input: string,
-    volume?: number
+    volume?: number,
+    startSeconds: number = 0,
 ) {
     if (!framePlayer) return;
 
@@ -66,8 +67,9 @@ export function loadNewVideo(
 
     // cueVideoById, not loadVideoById: loading starts playback, and pausing it before the first
     // frame is painted leaves the iframe black with no controls until something plays it again.
-    // Cueing lands directly in the state we actually want - poster shown, positioned at 0, silent.
-    framePlayer.cueVideoById(target);
+    // Cueing lands directly in the state we actually want - poster shown, positioned at the start
+    // offset, silent.
+    framePlayer.cueVideoById(target, startSeconds);
 
     dispatch({
         type: 'setId',

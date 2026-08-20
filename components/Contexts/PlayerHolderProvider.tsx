@@ -70,7 +70,12 @@ function PlayerHolderProvider({ children, playerCount = DEFAULT_PLAYER_COUNT }: 
     playerCount?: number;
 }) {
 
-    const { presetDispatch } = usePreset();
+    const { presetState, presetDispatch } = usePreset();
+
+    // The player event handlers are built once and live for the players' lifetime, so anything
+    // they need to read later has to come through a ref rather than a closure.
+    const presetRef = useRef(presetState);
+    presetRef.current = presetState;
 
     // ------- YT IFRAME API INIT -------
     const [playerHolder, dispatchPlayerHolder] = useReducer(
@@ -132,7 +137,10 @@ function PlayerHolderProvider({ children, playerCount = DEFAULT_PLAYER_COUNT }: 
                     },
                 );
             } else if (changedState === YT.PlayerState.ENDED) {
-                player.seekTo(0, true);
+                // Loop back to the slot's start offset, not to 0. Read through a ref because this
+                // handler is created once, when the players are built, and would otherwise close
+                // over the offsets as they were at that moment.
+                player.seekTo(presetRef.current.players[playerIdx]?.startSeconds ?? 0, true);
             }
         }
 

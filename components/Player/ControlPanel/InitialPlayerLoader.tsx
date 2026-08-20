@@ -38,7 +38,15 @@ function InitialPlayerLoader({ onLoaded }: InitialPlayerLoaderProps) {
                 payload: presetState.players[idx].volume,
             });
 
-            loadNewVideo(idx, presetDispatch, holder.player, presetState.players[idx].videoId);
+            loadNewVideo(
+                idx,
+                presetDispatch,
+                holder.player,
+                presetState.players[idx].videoId,
+                undefined,
+                // A restored preset cues at the offset it was saved with
+                presetState.players[idx].startSeconds,
+            );
         });
 
         onLoaded();
