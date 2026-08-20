@@ -1,6 +1,5 @@
 // Viewer.tsx
 import React, { useMemo } from 'react';
-import { QueryClient, QueryClientProvider } from 'react-query';
 import { useWindowSize } from '../Contexts/WindowSizeProvider';
 import { breakpoints } from '../utils/breakpoints';
 import ViewColumn from './ViewColumn';
@@ -13,21 +12,20 @@ interface IViewColumnWrapperProps {
 }
 
 const ViewColumnWrapper = ({ widthClass, type }: IViewColumnWrapperProps) => {
-        const { isMobile, windowHeight } = useWindowSize();
-        return (
-            <div
-                key={type}
-                className={`${widthClass} flex flex-col gap-2 overflow-x-hidden`}
-                style={{ height: (windowHeight ?? 0) - 4 * 20 }}
-            >
-                {!isMobile && <p className="w-full rounded bg-indigo-900/25 text-center capitalize">{type}</p>}
-                <div className="h-full scroll-smooth rounded bg-indigo-900/25 p-1">
-                    {!isMobile ? <ViewColumn type={type} /> : <ViewColumnMobile />}
-                </div>
+    const { isMobile, windowHeight } = useWindowSize();
+
+    return (
+        <div
+            className={`${widthClass} flex flex-col gap-2 overflow-x-hidden`}
+            style={{ height: (windowHeight ?? 0) - 4 * 20 }}
+        >
+            {!isMobile && <p className="w-full rounded bg-indigo-900/25 text-center capitalize">{type}</p>}
+            <div className="h-full scroll-smooth rounded bg-indigo-900/25 p-1">
+                {!isMobile ? <ViewColumn type={type} /> : <ViewColumnMobile />}
             </div>
-        );
-    }
-;
+        </div>
+    );
+};
 
 export function Viewer() {
     const { windowWidth } = useWindowSize();
@@ -52,15 +50,13 @@ export function Viewer() {
 
     return (
         <div className="flex flex-1 flex-row gap-4">
-            <QueryClientProvider client={new QueryClient()}>
-                {columns.types.map((type) => (
-                    <ViewColumnWrapper
-                        key={type}
-                        widthClass={columns.widthClass}
-                        type={type as TListType}
-                    />
-                ))}
-            </QueryClientProvider>
+            {columns.types.map((type) => (
+                <ViewColumnWrapper
+                    key={type}
+                    widthClass={columns.widthClass}
+                    type={type as TListType}
+                />
+            ))}
         </div>
     );
 }

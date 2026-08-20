@@ -1,6 +1,6 @@
 // ViewColumn.tsx
 import React, { useState } from 'react';
-import { FilterItemsList, ListItems, NewItemsList, SearchItemsList } from './ItemLists';
+import { FilterItemsList, ItemsList, ListItems, NewItemsList } from './ItemLists';
 import TListType from './types/TListType';
 import { useSearchItems } from './hooks/useSearchItems';
 
@@ -14,7 +14,7 @@ export default function ViewColumn({ type = 'list' }: ViewColumnProps) {
 
     return (
         <div className="h-full">
-            <div className="flex flex-col gap-2 h-full">
+            <div className="flex h-full flex-col gap-2">
                 <input
                     type="text"
                     className="rounded bg-transparent p-1"
@@ -23,14 +23,14 @@ export default function ViewColumn({ type = 'list' }: ViewColumnProps) {
                         setSearch(e.target.value);
                     }}
                 />
-                {search && (<SearchItemsList hook={searchHook} />)}
-                {!search && type === 'list' && <ListItems />}
+                {/* A search overrides whatever list the column would otherwise show */}
+                {search && <ItemsList hook={searchHook} />}
                 {!search && type === 'new' && <NewItemsList />}
                 {!search && type === 'filter' && <FilterItemsList />}
-                {!search && type === 'owned' && <ListItems />}
-                {!search && type === 'trend' && <ListItems />}
+                {/* TODO: 'trend' and 'owned' render the plain list until they have their own
+                    routes - three of the four columns currently show the same data. */}
+                {!search && (type === 'list' || type === 'owned' || type === 'trend') && <ListItems />}
             </div>
         </div>
-    )
-        ;
+    );
 }
