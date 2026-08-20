@@ -1,27 +1,35 @@
+import { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../utils/prismaClientProvider';
 import { buildQuery } from '../../../utils/separateTags';
 import { getAverageColor } from './calculateColor';
-import { NextApiRequest, NextApiResponse } from 'next';
-import { IVideoData } from '../../../components/Creator/types/IVideoData';
+import { ApiError, createRoute, readOptionalString, readString } from '../../../utils/api/handler';
 
-type track_data = IVideoData & {
-    tags: string;
-    url: string;
-}
+const FALLBACK_COLOR = '#000000';
 
-export default async function handle(req: NextApiRequest, res: NextApiResponse) {
-    const { title, author_name, url, provider_url, tags, thumbnail_url } = req.body as track_data;
-    // console.log(`title: ${title}\n author_name: ${author_name}\n url: ${url}\n provider_url: ${provider_url}\n tags: ${tags}\n thumbnail_url: ${thumbnail_url}`);
+export default createRoute(['POST'], async (req: NextApiRequest, res: NextApiResponse) => {
+    // The body arrives from the network and was previously cast straight to a typed shape, so a
+    // missing title or author reached Prisma as undefined and failed there instead of here.
+    const body = req.body ?? {};
+    const title = readString(body.title, 'title');
+    const author_name = readString(body.author_name, 'author_name');
+    const url = readString(body.url, 'url');
+    const provider_url = readString(body.provider_url, 'provider_url');
+    const tags = readString(body.tags, 'tags');
+    const thumbnail_url = readOptionalString(body.thumbnail_url);
 
     const connectOrCreateQuery = buildQuery(tags);
-    let track_color = '#000000';
+
+    let track_color = FALLBACK_COLOR;
     let luminance = 0;
-    try {
-        const color_data = await getAverageColor(thumbnail_url);
-        track_color = color_data.color;
-        luminance = color_data.luminance;
-    } catch (e) {
-        console.log(`error processing ${thumbnail_url} | ${e}`);
+    if (thumbnail_url) {
+        try {
+            const color_data = await getAverageColor(thumbnail_url);
+            track_color = color_data.color;
+            luminance = color_data.luminance;
+        } catch (e) {
+            // A thumbnail that will not load is not a reason to reject the track
+            console.warn(`error processing ${thumbnail_url} | ${e}`);
+        }
     }
 
     // Separate Prisma call to handle the artist
@@ -33,18 +41,17 @@ export default async function handle(req: NextApiRequest, res: NextApiResponse) 
             create: { name: author_name },
         });
     } catch (e) {
-        console.log(`Error handling artist creation/upsert: ${e}`);
-        res.status(500).json({ error: 'Error processing artist data' });
-        return;
+        console.error(`Error handling artist creation/upsert: ${e}`);
+        throw new ApiError(500, 'Error processing artist data');
     }
 
     try {
         const createTrack = await prisma.track.create({
             data: {
-                title: title,
-                url: url,
+                title,
+                url,
                 platform: provider_url,
-                luminance: luminance,
+                luminance,
                 color: track_color,
                 tags: {
                     connectOrCreate: connectOrCreateQuery,
@@ -59,9 +66,9 @@ export default async function handle(req: NextApiRequest, res: NextApiResponse) 
             },
         });
 
-        res.json(createTrack);
+        res.status(201).json(createTrack);
     } catch (e) {
-        console.log(`Error creating track: ${e}`);
-        res.status(500).json({ error: 'Error creating track' });
+        console.error(`Error creating track: ${e}`);
+        throw new ApiError(500, 'Error creating track');
     }
-}
+});

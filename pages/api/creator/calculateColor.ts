@@ -1,6 +1,7 @@
 import Jimp from 'jimp';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../utils/prismaClientProvider';
+import { assertCronAuthorized, createRoute } from '../../../utils/api/handler';
 
 function rgbToHex(rgb: { r: number, g: number, b: number, a?: number }) {
     let r = rgb.r.toString(16);
@@ -78,10 +79,13 @@ export async function getAverageColor(url: string, global_url?: boolean): Promis
     return { 'color': averageColorHex, 'luminance': luminosity };
 }
 
-export default async function handle(
-    req: NextApiRequest,
-    res: NextApiResponse,
-) {
+/**
+ * Backfill job: recomputes the dominant colour of every track. Behind the cron secret because it
+ * rewrites the whole table and fetches one thumbnail per row.
+ */
+export default createRoute(['GET', 'POST'], async (req: NextApiRequest, res: NextApiResponse) => {
+    assertCronAuthorized(req);
+
     // get all entries that don't have a set color field (#000000)
     const tracks = await prisma.track.findMany({
         /* where: {
@@ -126,5 +130,5 @@ export default async function handle(
     );
 
     // console.log(`updated ${updatedTracks.length} tracks`);
-    res.json(updatedTracks);
-}
+    res.status(200).json(updatedTracks);
+});

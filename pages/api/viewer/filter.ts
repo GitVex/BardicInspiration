@@ -1,48 +1,41 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../utils/prismaClientProvider';
+import { createRoute, readPagination, readStringArray } from '../../../utils/api/handler';
+import TPage from '../../../components/Viewer/types/TPage';
 import TItem from '../../../components/Viewer/types/TItem';
 
-export default async function handle(req: NextApiRequest, res: NextApiResponse) {
-    const { page = 0, pageSize = 10 } = req.query;
-    const { filter = [] } = req.body;
+export default createRoute(['POST'], async (req: NextApiRequest, res: NextApiResponse) => {
+    const { page, pageSize, skip } = readPagination(req);
+    // Validated rather than trusted: this array is mapped straight into a Prisma where-clause,
+    // and a body of { filter: [{}] } used to reach the database as a malformed query.
+    const filter = readStringArray(req.body?.filter, 'filter');
 
-    // Convert page, pageSize, and excludeIds to appropriate types
-    const pageNumber = parseInt(page as string, 10);
-    const pageSizeNumber = parseInt(pageSize as string, 10);
-    const skip = pageNumber * pageSizeNumber;
-
-    // Generate the where clause based on the filter
     const where = filter.length > 0
-        ? {
-            AND: [
-                ...filter.map((tag: string) => ({ tags: { some: { name: tag } } })),
-            ],
-        } : {};
+        ? { AND: filter.map(tag => ({ tags: { some: { name: tag } } })) }
+        : {};
 
-    // Query the database with pagination and filtering
-    const result = await prisma.track.findMany({
-        skip: skip,
-        take: pageSizeNumber,
-        where: where,
-        include: {
-            tags: true,
-            artist: true,
-        },
-    });
+    const [result, totalRecords] = await Promise.all([
+        prisma.track.findMany({
+            skip,
+            take: pageSize,
+            where,
+            include: {
+                tags: true,
+                artist: true,
+            },
+        }),
+        prisma.track.count({ where }),
+    ]);
 
-    // Prepare pagination info
-    const totalRecords = await prisma.track.count({ where });
-    const totalPages = Math.ceil(totalRecords / pageSizeNumber);
-
-    const pageObj = {
+    const pageObj: TPage = {
         data: result as TItem[],
         pagination: {
             totalRecords,
-            totalPages,
-            currentPage: pageNumber,
-            pageSize: pageSizeNumber,
+            totalPages: Math.ceil(totalRecords / pageSize),
+            currentPage: page,
+            pageSize,
         },
     };
 
     res.status(200).json(pageObj);
-}
+});
