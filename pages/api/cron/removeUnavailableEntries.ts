@@ -1,11 +1,11 @@
 import { prisma } from '../../../utils/prismaClientProvider';
 import { checkImageAvailability } from '../creator/calculateColor';
 import { NextApiRequest, NextApiResponse } from 'next';
+import { assertCronAuthorized, createRoute } from '../../../utils/api/handler';
 
-export default async function handler(
-    req: NextApiRequest,
-    res: NextApiResponse,
-) {
+export default createRoute(['GET', 'POST'], async (req: NextApiRequest, res: NextApiResponse) => {
+    assertCronAuthorized(req);
+
     // first get all track urls
     const allTracks = await prisma.track.findMany({
         select: {
@@ -51,7 +51,11 @@ export default async function handler(
     // filter out all valid urls
     blockedTracks = blockedTracks.filter((entry) => entry !== 'valid' && entry.blocked.length > 2 && entry.blocked !== 'thumbnail');
 
-    //test wise
+    // NOTE: this job currently reports what it *would* remove and deletes nothing. The map below
+    // never awaits (or returns) prisma.track.delete, and reads entry.id where the column is
+    // track_id, so no row is ever removed. Left as-is deliberately - switching it on is a
+    // destructive change that wants its own review, and the log entry that would record the
+    // deletion is still commented out.
     const tracksToBeDeleted = blockedTracks;
 
     // create new log entry to document the deletion
@@ -75,4 +79,4 @@ export default async function handler(
     );
 
     res.status(200).json(deletedTracks);
-}
+});

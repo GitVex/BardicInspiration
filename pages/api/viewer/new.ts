@@ -1,45 +1,37 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../utils/prismaClientProvider';
+import { createRoute, readPagination } from '../../../utils/api/handler';
 import TPage from '../../../components/Viewer/types/TPage';
 import TItem from '../../../components/Viewer/types/TItem';
 
-export default async function handle(req: NextApiRequest, res: NextApiResponse) {
-    const { page = 0, pageSize = 10 } = req.query;
+// POST as well as GET: the Viewer's shared fetcher posts to every list route.
+export default createRoute(['GET', 'POST'], async (req: NextApiRequest, res: NextApiResponse) => {
+    const { page, pageSize, skip } = readPagination(req);
 
-    // Convert page and pageSize to numbers
-    const pageNumber = parseInt(page as string, 10);
-    const pageSizeNumber = parseInt(pageSize as string, 10);
+    const [result, totalRecords] = await Promise.all([
+        prisma.track.findMany({
+            skip,
+            take: pageSize,
+            orderBy: {
+                created_at: 'desc',
+            },
+            include: {
+                tags: true,
+                artist: true,
+            },
+        }),
+        prisma.track.count(),
+    ]);
 
-    // Calculate the number of records to skip
-    const skip = pageNumber * pageSizeNumber;
-
-    // Query the database
-    const result = await prisma.track.findMany({
-        skip: skip,
-        take: pageSizeNumber,
-        orderBy: {
-            created_at: 'desc',
-        },
-        include: {
-            tags: true,
-            artist: true,
-        },
-    });
-
-    // Query the total number of records for pagination info
-    const totalRecords = await prisma.track.count();
-
-    // Prepare pagination info
-    const totalPages = Math.ceil(totalRecords / pageSizeNumber);
     const pageObj: TPage = {
         data: result as TItem[],
         pagination: {
             totalRecords,
-            totalPages,
-            currentPage: pageNumber,
-            pageSize: pageSizeNumber,
+            totalPages: Math.ceil(totalRecords / pageSize),
+            currentPage: page,
+            pageSize,
         },
     };
 
     res.status(200).json(pageObj);
-}
+});
