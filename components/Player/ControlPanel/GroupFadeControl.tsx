@@ -86,23 +86,26 @@ function GroupFadeControl({ initialLoadDone }: { initialLoadDone: boolean }) {
     const { holders } = usePlayerHolder();
     const disable = !initialLoadDone;
 
-    // Filter out null framedPlayers early
-    const framedPlayers = holders
-        .map(holder => holder.player)
-        .filter((player): player is IFPlayer => player !== null);
+    // Filter out null framedPlayers early. Memoised on holders, because .map().filter() built a
+    // new array every render, which changed the identity the handlers below key off and made
+    // memoising them pointless.
+    const framedPlayers = React.useMemo(
+        () => holders
+            .map(holder => holder.player)
+            .filter((player): player is IFPlayer => player !== null),
+        [holders],
+    );
 
     const controls = useStackControls();
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    const handleGroupFadeIn = React.useCallback(
-        createGroupFadeHandler('in', framedPlayers, controls),
-        [framedPlayers, controls]
+    const handleGroupFadeIn = React.useMemo(
+        () => createGroupFadeHandler('in', framedPlayers, controls),
+        [framedPlayers, controls],
     );
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    const handleGroupFadeOut = React.useCallback(
-        createGroupFadeHandler('out', framedPlayers, controls),
-        [framedPlayers, controls]
+    const handleGroupFadeOut = React.useMemo(
+        () => createGroupFadeHandler('out', framedPlayers, controls),
+        [framedPlayers, controls],
     );
 
     return (

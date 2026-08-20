@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { breakpoints } from '../utils/breakpoints';
 
 interface WindowSizeContextType {
@@ -40,8 +40,13 @@ export const WindowSizeProvider: React.FC<WindowSizeProviderProps> = ({ children
         };
     }, []);
 
+    const value = useMemo(
+        () => ({ windowWidth, windowHeight, isMobile }),
+        [windowWidth, windowHeight, isMobile],
+    );
+
     return (
-        <WindowSizeContext.Provider value={{ windowWidth, windowHeight, isMobile }}>
+        <WindowSizeContext.Provider value={value}>
             {children}
         </WindowSizeContext.Provider>
     );

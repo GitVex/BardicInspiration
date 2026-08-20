@@ -1,6 +1,6 @@
-import React, { useCallback, useContext, useEffect, useReducer, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import IFPlayer from '../Player/types/IFPlayer';
-import { playerHolderReducer, PlayerHolderState } from './states';
+import { PlayerHolder, playerHolderReducer, PlayerHolderState } from './states';
 import { usePreset } from '../Player/Contexts/PresetProvider';
 import { loadYouTubeApi } from '../Player/ytApiLoader';
 
@@ -27,7 +27,9 @@ interface PlayerHolderContextType extends PlayerHolderState {
     registerSlot: (index: number, element: HTMLElement | null) => void;
 }
 
-const PlayerHolderContext = React.createContext({} as PlayerHolderContextType);
+// null rather than an empty object cast: a consumer mounted outside the provider should fail at
+// the useContext call, not later on an undefined holders array.
+const PlayerHolderContext = React.createContext<PlayerHolderContextType | null>(null);
 
 // ----------------- INITIAL STATES -----------------
 function createInitialPlayerHolderState(playerCount: number): PlayerHolderState {
@@ -44,24 +46,20 @@ function createInitialPlayerHolderState(playerCount: number): PlayerHolderState 
 }
 
 // ----------------- HOOKS -----------------
-export function usePlayerHolder() {
+export function usePlayerHolder(): PlayerHolderContextType {
     const context = useContext(PlayerHolderContext);
-    if (context === undefined) {
+    if (!context) {
         throw new Error('usePlayerHolder must be used within a PlayerHolderProvider');
     }
     return context;
 }
 
-export function usePlayerHolderById(id: number) {
-    const playerHolder = useContext(PlayerHolderContext);
+export function usePlayerHolderById(id: number): PlayerHolder {
+    const { holders } = usePlayerHolder();
 
-    const holder = playerHolder.holders?.[id];
-
-    if (!holder) {
-        return { id: -1, player: null, isReady: false };
-    }
-
-    return holder;
+    // An id outside the stack gets an inert holder rather than a throw: callers treat a null
+    // player as "not ready yet", which is the same thing as far as they are concerned.
+    return holders[id] ?? { id: -1, player: null, isReady: false };
 }
 
 // ----------------- PROVIDER -----------------
@@ -208,12 +206,18 @@ function PlayerHolderProvider({ children, playerCount = DEFAULT_PLAYER_COUNT }: 
         console.log('playerHolder changed', playerHolder);
     }, [playerHolder]); */
 
-    return (
-        <PlayerHolderContext.Provider value={{
+    // registerSlot is stable, so this changes only when a player is built or becomes ready
+    const value = useMemo<PlayerHolderContextType>(
+        () => ({
             holders: playerHolder.holders,
             firstLoadDone: playerHolder.firstLoadDone,
             registerSlot,
-        }}>
+        }),
+        [playerHolder.holders, playerHolder.firstLoadDone, registerSlot],
+    );
+
+    return (
+        <PlayerHolderContext.Provider value={value}>
             {children}
         </PlayerHolderContext.Provider>
     );

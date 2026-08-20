@@ -2,7 +2,7 @@ import VolumeSlider from './VolumeSlider';
 import ControlPanel from './ControlPanel/ControlPanel';
 import PlayerComponent from './PlayerComponent';
 import { PlayerControlsProvider } from './Contexts/PlayerControlsProvider';
-import { useStackControls } from '../Contexts/StackControlsProvider';
+import { useStackActions, useStackState } from '../Contexts/StackControlsProvider';
 import { DEFAULT_PLAYER_COUNT } from '../utils/DEFAULTS';
 
 // Sizing authority for the whole player: the parent overlay is fixed inset-0, so h-full here is
@@ -10,7 +10,8 @@ import { DEFAULT_PLAYER_COUNT } from '../utils/DEFAULTS';
 // nothing is content-sized. min-h-0/min-w-0 are what let the flex children actually shrink;
 // without them flex items refuse to go below their content size and the layout overflows.
 function PlayerUI() {
-    const { masterVolume, setMasterVolume } = useStackControls();
+    const { masterVolume } = useStackState();
+    const { setMasterVolume } = useStackActions();
 
     return (
         <div className="flex h-full w-full flex-row items-stretch justify-center gap-4 p-4 backdrop-blur-md">

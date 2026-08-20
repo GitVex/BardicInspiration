@@ -1,8 +1,9 @@
-// PlayerContext.tsx
-import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+// PlayerControlsProvider.tsx
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { usePlayerHolderById } from '../../Contexts/PlayerHolderProvider';
-import { useStackControls } from '../../Contexts/StackControlsProvider';
+import { useStackActions, useStackState } from '../../Contexts/StackControlsProvider';
 import IFPlayer from '../types/IFPlayer';
+import { SavedVolume } from '../types/states';
 
 interface PlayerControlsProviderType {
     playerId: number;
@@ -11,8 +12,8 @@ interface PlayerControlsProviderType {
     setSelected: () => void;
     localVolume: number;
     setLocalVolume: (vol: number) => void;
-    savedVolume: { hasSaved: boolean, prevVol: number };
-    setSavedVolume: (vol: { hasSaved: boolean, prevVol: number }) => void;
+    savedVolume: SavedVolume;
+    setSavedVolume: (vol: SavedVolume) => void;
     fadeAnimationHandle: number | null;
     setFadeAnimationHandle: (animID: number | null) => void;
 }
@@ -24,53 +25,60 @@ interface PlayerControlsProviderProps {
     playerId: number;
 }
 
+/**
+ * Narrows the stack-wide, index-addressed state down to one player, so nothing below this ever
+ * has to know its own index. The context value is memoised: without it, every consumer of every
+ * player re-rendered whenever any single player's volume moved.
+ */
 export const PlayerControlsProvider = ({ children, playerId }: PlayerControlsProviderProps) => {
-    const {
-        presetState,
-        debouncedPresetDispatch,
-        localVolumes,
-        localVolumesDispatch,
-        masterVolumeModifier,
-        fadeAnimations,
-        fadeAnimationsDispatch,
-    } = useStackControls();
+    const { presetState, localVolumes, masterVolumeModifier, fadeAnimations } = useStackState();
+    const { debouncedPresetDispatch, localVolumesDispatch, fadeAnimationsDispatch } = useStackActions();
 
-    const playerInPreset = presetState.players[playerId];
     const framePlayer = usePlayerHolderById(playerId).player as IFPlayer;
 
-    const [savedVolume, setSavedVolume] = useState({ hasSaved: false, prevVol: 0 });
+    const [savedVolume, setSavedVolume] = useState<SavedVolume>({ hasSaved: false, prevVol: 0 });
 
-    const fadeAnimationHandle = fadeAnimations.fadeAnimationHandles[playerId];
-    const setFadeAnimationHandle = (animId: number | null) =>
-        fadeAnimationsDispatch({
-            type: 'setFadeAnimationHandle',
-            index: playerId,
-            payload: animId,
-        });
-
+    const playerInPreset = presetState.players[playerId];
     const selected = playerInPreset?.selected ?? false;
-    const setSelected = () => {
-        debouncedPresetDispatch?.({
-            type: selected ? 'deselect' : 'select',
-            index: playerId,
-        });
-    };
-
     const localVolume = localVolumes.volume[playerId];
-    const setLocalVolume = (vol: number) => {
-        if (!framePlayer) return;
+    const fadeAnimationHandle = fadeAnimations.fadeAnimationHandles[playerId];
 
-        localVolumesDispatch({
-            type: 'setVolume',
-            index: playerId,
-            payload: vol,
-        });
-        debouncedPresetDispatch({
-            type: 'setVolume',
-            index: playerId,
-            payload: vol,
-        });
-    };
+    const setFadeAnimationHandle = useCallback(
+        (animId: number | null) =>
+            fadeAnimationsDispatch({
+                type: 'setFadeAnimationHandle',
+                index: playerId,
+                payload: animId,
+            }),
+        [fadeAnimationsDispatch, playerId],
+    );
+
+    const setSelected = useCallback(
+        () =>
+            debouncedPresetDispatch({
+                type: selected ? 'deselect' : 'select',
+                index: playerId,
+            }),
+        [debouncedPresetDispatch, selected, playerId],
+    );
+
+    const setLocalVolume = useCallback(
+        (vol: number) => {
+            if (!framePlayer) return;
+
+            localVolumesDispatch({
+                type: 'setVolume',
+                index: playerId,
+                payload: vol,
+            });
+            debouncedPresetDispatch({
+                type: 'setVolume',
+                index: playerId,
+                payload: vol,
+            });
+        },
+        [framePlayer, localVolumesDispatch, debouncedPresetDispatch, playerId],
+    );
 
     useEffect(() => {
         if (!framePlayer || framePlayer?.setVolume === undefined) {
@@ -79,9 +87,8 @@ export const PlayerControlsProvider = ({ children, playerId }: PlayerControlsPro
         framePlayer.setVolume(localVolume * masterVolumeModifier);
     }, [framePlayer, localVolume, masterVolumeModifier]);
 
-
-    return (
-        <PlayerControlsContext.Provider value={{
+    const value = useMemo<PlayerControlsProviderType>(
+        () => ({
             playerId,
             framePlayer,
             selected,
@@ -92,7 +99,22 @@ export const PlayerControlsProvider = ({ children, playerId }: PlayerControlsPro
             setSavedVolume,
             fadeAnimationHandle,
             setFadeAnimationHandle,
-        }}>
+        }),
+        [
+            playerId,
+            framePlayer,
+            selected,
+            setSelected,
+            localVolume,
+            setLocalVolume,
+            savedVolume,
+            fadeAnimationHandle,
+            setFadeAnimationHandle,
+        ],
+    );
+
+    return (
+        <PlayerControlsContext.Provider value={value}>
             {children}
         </PlayerControlsContext.Provider>
     );
