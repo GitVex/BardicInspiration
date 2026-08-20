@@ -116,6 +116,29 @@ export const PlayerControlsProvider = ({ children, playerId }: PlayerControlsPro
         framePlayer.setVolume(localVolume * masterVolumeModifier);
     }, [framePlayer, localVolume, masterVolumeModifier]);
 
+    /**
+     * Loops the video back to its start offset once it passes the end offset.
+     *
+     * The natural end of a video is handled by the holder's ENDED event; an early end has no event
+     * to hang off, so it has to be polled. This lives here rather than in the holder because the
+     * offsets are per player and change while the players stay alive.
+     */
+    useEffect(() => {
+        if (endSeconds === null) return;
+        if (typeof framePlayer?.getCurrentTime !== 'function') return;
+        // An end at or before the start would seek in a tight loop
+        if (endSeconds <= startSeconds) return;
+
+        const intervalId = setInterval(() => {
+            if (framePlayer.getPlayerState() !== YT.PlayerState.PLAYING) return;
+            if (framePlayer.getCurrentTime() < endSeconds) return;
+
+            framePlayer.seekTo(startSeconds, true);
+        }, 250);
+
+        return () => clearInterval(intervalId);
+    }, [framePlayer, startSeconds, endSeconds]);
+
     const value = useMemo<PlayerControlsProviderType>(
         () => ({
             playerId,

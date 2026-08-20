@@ -6,7 +6,7 @@ import { usePlayerControls } from './Contexts/PlayerControlsProvider';
 import { useStackActions, useStackState } from '../Contexts/StackControlsProvider';
 import { usePlayerHolder } from '../Contexts/PlayerHolderProvider';
 import { useTrackByVideoId } from './hooks/useTrackByVideoId';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
 function PlayerComponent() {
     const { selected, setSelected, playerId, videoId, localVolume, setLocalVolume } = usePlayerControls();
@@ -150,6 +150,12 @@ function SettingsPanel() {
     // Held locally so a half-typed value never reaches the preset
     const [start, setStart] = useState(String(startSeconds));
     const [end, setEnd] = useState(endSeconds === null ? '' : String(endSeconds));
+
+    // Follow the committed values when something else changes them - loading a different video
+    // clears the offsets, and the fields would otherwise keep showing the old track's numbers.
+    // Typing does not move the committed value, so this never fights the user mid-edit.
+    useEffect(() => setStart(String(startSeconds)), [startSeconds]);
+    useEffect(() => setEnd(endSeconds === null ? '' : String(endSeconds)), [endSeconds]);
 
     const canCapture = typeof framePlayer?.getCurrentTime === 'function';
 

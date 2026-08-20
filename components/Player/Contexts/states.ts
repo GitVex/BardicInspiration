@@ -126,11 +126,24 @@ export const playerStateReducer = (state: PresetState, action: PlayerStateAction
                 ...state,
                 players: updatePlayerAtIndex(state.players, action.index, { pausedAt: action.payload }),
             };
-        case 'setId':
+        case 'setId': {
+            // Offsets describe a specific video, so swapping the video clears them. Without this a
+            // 5s end offset left over from the previous track would loop an hour-long ambience
+            // every five seconds. Re-setting the same id (the initial preset load does exactly
+            // that) leaves them alone, so a restored preset keeps its offsets.
+            const isDifferentVideo = state.players[action.index]?.videoId !== action.payload;
+
             return {
                 ...state,
-                players: updatePlayerAtIndex(state.players, action.index, { videoId: action.payload }),
+                players: updatePlayerAtIndex(
+                    state.players,
+                    action.index,
+                    isDifferentVideo
+                        ? { videoId: action.payload, startSeconds: 0, endSeconds: null }
+                        : { videoId: action.payload },
+                ),
             };
+        }
         case 'setOffsets':
             return {
                 ...state,
