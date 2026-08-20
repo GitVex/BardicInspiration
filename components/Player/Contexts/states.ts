@@ -13,6 +13,12 @@ export interface PlayerState {
     savedVolume: { hasSaved: boolean; prevVol: number };
     pausedAt: number;
     videoId: string;
+    /** Seconds into the video where playback and looping should begin. */
+    startSeconds: number;
+    /** Seconds at which to loop back to startSeconds, or null to play to the end. */
+    endSeconds: number | null;
+    /** Overrides the volume-proportional default when this player fades. */
+    fadeDurationMs: number | null;
 }
 
 export type PlayerStateAction =
@@ -21,6 +27,8 @@ export type PlayerStateAction =
     | SetIdAction
     | SelectAction
     | SetTitleAction
+    | SetOffsetsAction
+    | SetFadeDurationAction
     | SetPresetAction;
 
 type VolumeAction = SetVolumeAction | SetSavedVolumeAction | SetMasterVolumeAction;
@@ -57,6 +65,18 @@ interface SetIdAction {
 interface SetTitleAction {
     type: 'setTitle';
     payload: string;
+}
+
+interface SetOffsetsAction {
+    type: 'setOffsets';
+    index: number;
+    payload: { startSeconds: number; endSeconds: number | null };
+}
+
+interface SetFadeDurationAction {
+    type: 'setFadeDuration';
+    index: number;
+    payload: number | null;
 }
 
 interface SelectAction {
@@ -110,6 +130,19 @@ export const playerStateReducer = (state: PresetState, action: PlayerStateAction
             return {
                 ...state,
                 players: updatePlayerAtIndex(state.players, action.index, { videoId: action.payload }),
+            };
+        case 'setOffsets':
+            return {
+                ...state,
+                players: updatePlayerAtIndex(state.players, action.index, {
+                    startSeconds: action.payload.startSeconds,
+                    endSeconds: action.payload.endSeconds,
+                }),
+            };
+        case 'setFadeDuration':
+            return {
+                ...state,
+                players: updatePlayerAtIndex(state.players, action.index, { fadeDurationMs: action.payload }),
             };
         case 'select':
             return {

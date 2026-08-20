@@ -28,6 +28,9 @@ export function createInitialPresetState(playerCount: number): PresetState {
                 savedVolume: { hasSaved: false, prevVol: DEFAULT_VOLUME },
                 pausedAt: Date.now(),
                 videoId: DEFAULT_VIDEO_ID,
+                startSeconds: 0,
+                endSeconds: null,
+                fadeDurationMs: null,
             })),
         masterVolume: 100,
     };
