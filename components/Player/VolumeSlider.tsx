@@ -40,9 +40,23 @@ interface VolumeSliderProps {
     height?: number | string;
     opaque?: boolean;
     bordered?: boolean;
+    /**
+     * Keeps the value label on screen instead of fading it out after an idle moment.
+     *
+     * The auto-hide saves horizontal space, which matters where the slider sits in a narrow
+     * column, but it also means the level can only be read by nudging the slider. Somewhere with
+     * room to spare is better off showing it permanently.
+     */
+    persistLabel?: boolean;
 }
 
-const VolumeSlider = ({ volumeControl, height, opaque = false, bordered = false }: VolumeSliderProps) => {
+const VolumeSlider = ({
+    volumeControl,
+    height,
+    opaque = false,
+    bordered = false,
+    persistLabel = true,
+}: VolumeSliderProps) => {
     const { localVolume, setLocalVolume } = volumeControl;
 
     const [labelCenter, setLabelCenter] = useState(0);
@@ -53,11 +67,22 @@ const VolumeSlider = ({ volumeControl, height, opaque = false, bordered = false 
     const labelTimeoutIDRef = useRef<NodeJS.Timeout | null>(null);
     const [showLabel, setShowLabel] = useState(false);
 
+    // The timer is only ever the auto-hide path's business; a persistent label never schedules one
     const delayHideLabel = useCallback(() => {
+        if (persistLabel) return;
+
         setShowLabel(true);
         if (labelTimeoutIDRef.current) clearTimeout(labelTimeoutIDRef.current);
         labelTimeoutIDRef.current = setTimeout(() => setShowLabel(false), 2500);
+    }, [persistLabel]);
+
+    // Without this a slider unmounted mid-countdown - a player rebuild, a preset swap - still had a
+    // pending timeout setting state on a gone component
+    useEffect(() => () => {
+        if (labelTimeoutIDRef.current) clearTimeout(labelTimeoutIDRef.current);
     }, []);
+
+    const labelVisible = persistLabel || showLabel;
 
     useEffect(() => {
         if (sliderRef.current && containerRef.current) {
@@ -99,8 +124,8 @@ const VolumeSlider = ({ volumeControl, height, opaque = false, bordered = false 
                 style={{ top: labelCenter }}
                 animate={{
                     y: '-50%',
-                    x: showLabel ? -20 : -40,
-                    opacity: showLabel ? 1 : 0,
+                    x: labelVisible ? -20 : -40,
+                    opacity: labelVisible ? 1 : 0,
                     transition: {
                         y: { duration: 0 },
                         opacity: { duration: 0.2 },
