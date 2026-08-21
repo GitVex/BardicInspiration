@@ -5,7 +5,7 @@ import { useStackControls } from '../../Contexts/StackControlsProvider';
 import ControlPanelButton from './utils/ControlPanelButton';
 import React from 'react';
 
-function createGroupFadeHandler(
+export function createGroupFadeHandler(
     direction: 'in' | 'out',
     framedPlayers: IFPlayer[],
     controls: ReturnType<typeof useStackControls>
