@@ -8,13 +8,16 @@ import { usePlayerHolder } from '../Contexts/PlayerHolderProvider';
 import { useTrackByVideoId } from './hooks/useTrackByVideoId';
 import { useVideoTitle } from './hooks/useVideoTitle';
 import ScrollTitle from '../Viewer/ScrollTitle';
-import React, { useCallback, useEffect, useState } from 'react';
+import { CARD_ACTION_EVENT, CardActionDetail } from './PlayerHotkeys';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 function PlayerComponent() {
     const { selected, setSelected, playerId, videoId, framePlayer, localVolume, setLocalVolume } =
         usePlayerControls();
-    const { focusedPlayerId } = useStackState();
+    const { focusedPlayerId, masterVolumeModifier } = useStackState();
+    const { debouncedPresetDispatch } = useStackActions();
     const { registerSlot } = usePlayerHolder();
+    const fadeToRef = useRef<HTMLInputElement | null>(null);
 
     // The focused player is by definition selected - it is the last one selected - so yellow wins
     // over the red the rest of the selection carries.
@@ -25,6 +28,44 @@ function PlayerComponent() {
     // stays untinted rather than falling back to some arbitrary hue.
     const { track } = useTrackByVideoId(videoId);
     const videoTitle = useVideoTitle(framePlayer, videoId, track?.title);
+
+    // Actions the hotkeys cannot perform themselves, because they need this card's player and its
+    // own fields. Delivered as a window event rather than threaded through context, so the
+    // registry stays independent of how many cards exist.
+    useEffect(() => {
+        const onCardAction = (event: Event) => {
+            const { playerId: target, action } = (event as CustomEvent<CardActionDetail>).detail;
+            if (target !== playerId) return;
+
+            if (action === 'flip') {
+                setShowSettings(show => !show);
+                return;
+            }
+
+            if (action === 'focusFadeTo') {
+                setShowSettings(false);
+                // after the flip back, so the field is on the visible face
+                setTimeout(() => fadeToRef.current?.focus(), 60);
+                return;
+            }
+
+            if (action === 'loadClipboard') {
+                navigator.clipboard?.readText?.()
+                    .then(text => {
+                        if (!framePlayer || !text) return;
+                        loadNewVideo(playerId, debouncedPresetDispatch, framePlayer, text.trim(),
+                            localVolume * masterVolumeModifier);
+                    })
+                    .catch(() => {
+                        // Firefox refuses clipboard reads outside extensions; fall back to the field
+                        setShowSettings(true);
+                    });
+            }
+        };
+
+        window.addEventListener(CARD_ACTION_EVENT, onCardAction);
+        return () => window.removeEventListener(CARD_ACTION_EVENT, onCardAction);
+    }, [playerId, framePlayer, debouncedPresetDispatch, localVolume, masterVolumeModifier]);
 
     // The provider builds the iframe inside this wrapper. It must stay childless in JSX so React
     // never reconciles into a subtree the YouTube API owns.
@@ -125,7 +166,7 @@ function PlayerComponent() {
 
                             <div className="flex min-w-0 flex-1 flex-col items-stretch justify-center gap-1">
                                 <FadeInButton />
-                                <FadeToInput />
+                                <FadeToInput inputRef={fadeToRef} />
                                 <FadeOutButton />
                             </div>
                         </div>
@@ -351,10 +392,11 @@ function FadeInButton() {
     </button>;
 }
 
-function FadeToInput() {
+function FadeToInput({ inputRef }: { inputRef?: React.Ref<HTMLInputElement> }) {
     const { framePlayer, fadeOptions } = useFadeControls();
 
     return <input
+        ref={inputRef}
         type="text"
         inputMode="numeric"
         className={`${fieldClass} w-full text-center`}
