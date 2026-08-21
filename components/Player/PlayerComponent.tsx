@@ -288,7 +288,7 @@ function FadeInButton() {
     } = usePlayerControls();
 
     return <button
-        className="rounded bg-gray-800/50 p-1 disabled:opacity-50 w-min"
+        className="rounded bg-gray-900/70 p-1 disabled:opacity-50 w-min"
         onClick={() => {
             fadeIn({
                 framePlayer,
@@ -323,7 +323,7 @@ function FadeToInput() {
 
     return <input
         type="text"
-        className="rounded bg-gray-800/50 p-1 w-16"
+        className="rounded bg-gray-900/70 p-1 w-16"
         placeholder="Volume"
         onKeyDown={e => {
             fadeInputHandler(e, {
@@ -351,7 +351,7 @@ function FadeOutButton() {
     } = usePlayerControls();
 
     return <button
-        className="rounded bg-gray-800/50 p-1 disabled:opacity-50 w-min"
+        className="rounded bg-gray-900/70 p-1 disabled:opacity-50 w-min"
         onClick={() => {
             fadeOut({
                 framePlayer,
