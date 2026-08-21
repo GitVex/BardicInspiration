@@ -1,6 +1,13 @@
 /* https://developers.google.com/youtube/iframe_api_reference?hl=de#Functions */
 
 export default interface IFPlayer extends YT.Player {
+    /**
+     * Undocumented but long-standing: the metadata of the video currently loaded. Not part of
+     * @types/youtube, and it stays empty for a short while after cueing until the player has the
+     * data, so callers have to tolerate an undefined title.
+     */
+    getVideoData: () => { title?: string; video_id?: string; author?: string } | undefined;
+
     /* addEventListener: (event: string, listener: string) => void;
     removeEventListener: (event: string, listener: string) => void;
     clearVideo: () => void;

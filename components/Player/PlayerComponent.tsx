@@ -6,16 +6,20 @@ import { usePlayerControls } from './Contexts/PlayerControlsProvider';
 import { useStackActions, useStackState } from '../Contexts/StackControlsProvider';
 import { usePlayerHolder } from '../Contexts/PlayerHolderProvider';
 import { useTrackByVideoId } from './hooks/useTrackByVideoId';
+import { useVideoTitle } from './hooks/useVideoTitle';
+import ScrollTitle from '../Viewer/ScrollTitle';
 import React, { useCallback, useEffect, useState } from 'react';
 
 function PlayerComponent() {
-    const { selected, setSelected, playerId, videoId, localVolume, setLocalVolume } = usePlayerControls();
+    const { selected, setSelected, playerId, videoId, framePlayer, localVolume, setLocalVolume } =
+        usePlayerControls();
     const { registerSlot } = usePlayerHolder();
     const [showSettings, setShowSettings] = useState(false); // Toggle for Video ID
 
     // Only tracks in the library carry a colour, so a video loaded by id that was never submitted
     // stays untinted rather than falling back to some arbitrary hue.
     const { track } = useTrackByVideoId(videoId);
+    const videoTitle = useVideoTitle(framePlayer, videoId, track?.title);
 
     // The provider builds the iframe inside this wrapper. It must stay childless in JSX so React
     // never reconciles into a subtree the YouTube API owns.
@@ -85,24 +89,39 @@ function PlayerComponent() {
                     animate={{ rotateY: showSettings ? 180 : 0 }}
                     transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
                 >
-                    {/* Front: mixing controls */}
+                    {/* Front: title over the mixing controls */}
                     <div
-                        className="absolute inset-0 flex flex-row gap-2 bg-gray-800/50 p-2"
+                        className="absolute inset-0 flex flex-col gap-1 bg-gray-800/50 p-2"
                         style={{ backfaceVisibility: 'hidden' }}
                     >
-                        <div className="flex min-h-0 w-1/2 flex-col items-center justify-center py-2">
-                            <VolumeSlider
-                                volumeControl={{ localVolume, setLocalVolume }}
-                                height={'100%'}
-                                opaque={false}
-                            />
+                        {/* truncate + maxWidth is ScrollTitle's contract: it measures scrollWidth
+                            against clientWidth to decide whether hovering should scroll it. pr-5
+                            keeps the text clear of the gear button that overlays this corner. */}
+                        <div
+                            className="w-full shrink-0 truncate pr-5 text-[11px] text-gray-300"
+                            style={{ maxWidth: '100%' }}
+                            title={videoTitle}
+                        >
+                            <ScrollTitle title={videoTitle} />
                         </div>
 
-                        <div className="flex flex-col items-center justify-center gap-1">
-                            <FadeInButton />
-                            <FadeToInput />
-                            <FadeOutButton />
+                        <div className="flex min-h-0 flex-1 flex-row gap-2">
+                            <div className="flex min-h-0 w-1/2 flex-col items-center justify-center">
+                                <VolumeSlider
+                                    volumeControl={{ localVolume, setLocalVolume }}
+                                    height={'100%'}
+                                    opaque={false}
+                                />
+                            </div>
+
+                            <div className="flex min-w-0 flex-1 flex-col items-stretch justify-center gap-1">
+                                <FadeInButton />
+                                <FadeToInput />
+                                <FadeOutButton />
+                            </div>
                         </div>
+
+                        <TransportButtons />
                     </div>
 
                     {/* Back: per-slot settings, pre-rotated so it reads correctly once turned */}
@@ -132,9 +151,12 @@ const fieldClass =
     'min-w-0 rounded bg-gray-900/70 px-1.5 py-0.5 text-[11px] text-gray-100 placeholder:text-gray-500 ' +
     'outline-none focus:ring-1 focus:ring-red-500/60 disabled:opacity-40';
 
+// inline-flex + centring rather than relying on the button's text-align: Tailwind's preflight sets
+// svg { display: block }, and a block child ignores text-align, so an icon-only button would sit
+// its icon flush left once the button is wider than the icon.
 const buttonClass =
-    'shrink-0 rounded bg-gray-700/70 px-1.5 py-0.5 text-[11px] text-gray-100 hover:bg-gray-600/70 ' +
-    'disabled:opacity-40 transition-colors';
+    'inline-flex shrink-0 items-center justify-center rounded bg-gray-700/70 px-1.5 py-0.5 ' +
+    'text-[11px] text-gray-100 hover:bg-gray-600/70 disabled:opacity-40 transition-colors';
 
 /** Seconds as typed, falling back to the committed value when the field holds nonsense. */
 function parseSeconds(raw: string, fallback: number | null): number | null {
@@ -275,7 +297,11 @@ function LoadVideoInput() {
     />;
 }
 
-function FadeInButton() {
+/**
+ * The fade controls all need the same six pieces of player state and assemble the same options
+ * object, so they share one hook rather than each destructuring the context by hand.
+ */
+function useFadeControls() {
     const {
         framePlayer,
         localVolume,
@@ -287,87 +313,89 @@ function FadeInButton() {
         fadeDurationMs,
     } = usePlayerControls();
 
+    return {
+        framePlayer,
+        fadeOptions: {
+            framePlayer,
+            localVolumeControl: { localVolume, setLocalVolume },
+            savedVolumeControl: { savedVolume, setSavedVolume },
+            fadeAnimationControl: { fadeAnimationHandle, setFadeAnimationHandle },
+            durationMs: fadeDurationMs,
+        },
+    };
+}
+
+function FadeInButton() {
+    const { framePlayer, fadeOptions } = useFadeControls();
+
     return <button
-        className="rounded bg-gray-900/70 p-1 disabled:opacity-50 w-min"
-        onClick={() => {
-            fadeIn({
-                framePlayer,
-                localVolumeControl: { localVolume, setLocalVolume },
-                savedVolumeControl: { savedVolume, setSavedVolume },
-                fadeAnimationControl: { fadeAnimationHandle, setFadeAnimationHandle },
-                durationMs: fadeDurationMs,
-            });
-        }}
+        className={`${buttonClass} p-1`}
+        onClick={() => fadeIn(fadeOptions)}
         disabled={!framePlayer}
+        title="Fade in"
     >
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"
-             className="size-6">
+             className="size-4">
             <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 18.75 7.5-7.5 7.5 7.5" />
             <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 7.5-7.5 7.5 7.5" />
         </svg>
-
     </button>;
 }
 
 function FadeToInput() {
-    const {
-        framePlayer,
-        localVolume,
-        setLocalVolume,
-        savedVolume,
-        setSavedVolume,
-        fadeAnimationHandle,
-        setFadeAnimationHandle,
-        fadeDurationMs,
-    } = usePlayerControls();
+    const { framePlayer, fadeOptions } = useFadeControls();
 
     return <input
         type="text"
-        className="rounded bg-gray-900/70 p-1 w-16"
-        placeholder="Volume"
-        onKeyDown={e => {
-            fadeInputHandler(e, {
-                framePlayer,
-                localVolumeControl: { localVolume, setLocalVolume },
-                savedVolumeControl: { savedVolume, setSavedVolume },
-                fadeAnimationControl: { fadeAnimationHandle, setFadeAnimationHandle },
-                durationMs: fadeDurationMs,
-            });
-        }}
+        inputMode="numeric"
+        className={`${fieldClass} w-full text-center`}
+        placeholder="Fade to"
+        onKeyDown={e => fadeInputHandler(e, fadeOptions)}
         disabled={!framePlayer}
     />;
 }
 
 function FadeOutButton() {
-    const {
-        framePlayer,
-        localVolume,
-        setLocalVolume,
-        savedVolume,
-        setSavedVolume,
-        fadeAnimationHandle,
-        setFadeAnimationHandle,
-        fadeDurationMs,
-    } = usePlayerControls();
+    const { framePlayer, fadeOptions } = useFadeControls();
 
     return <button
-        className="rounded bg-gray-900/70 p-1 disabled:opacity-50 w-min"
-        onClick={() => {
-            fadeOut({
-                framePlayer,
-                localVolumeControl: { localVolume, setLocalVolume },
-                savedVolumeControl: { savedVolume, setSavedVolume },
-                fadeAnimationControl: { fadeAnimationHandle, setFadeAnimationHandle },
-                durationMs: fadeDurationMs,
-                pLimit: 0,
-            });
-        }}
+        className={`${buttonClass} p-1`}
+        onClick={() => fadeOut({ ...fadeOptions, pLimit: 0 })}
         disabled={!framePlayer}
+        title="Fade out"
     >
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"
-             className="size-6">
+             className="size-4">
             <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 5.25 7.5 7.5 7.5-7.5m-15 6 7.5 7.5 7.5-7.5" />
         </svg>
-
     </button>;
+}
+
+/**
+ * Transport pair. Both are inert for now - mute has to decide whether it pauses the player or only
+ * silences it, and solo needs to know every other player's level to restore them afterwards.
+ */
+function TransportButtons() {
+    const { framePlayer } = usePlayerControls();
+
+    return (
+        <div className="flex shrink-0 flex-row gap-1">
+            <button
+                className={`${buttonClass} flex-1`}
+                onClick={() => {/* mute / pause this player */}}
+                disabled={!framePlayer}
+                title="Mute / pause"
+            >
+                Mute
+            </button>
+            <button
+                className={`${buttonClass} flex-1`}
+                onClick={() => {/* duck every other player */}}
+                disabled={!framePlayer}
+                title="Solo - duck every other player"
+            >
+                Solo
+            </button>
+        </div>
+    );
 }
