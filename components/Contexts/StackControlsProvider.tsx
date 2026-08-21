@@ -48,8 +48,10 @@ export interface StackState {
     disablePersistPreset: boolean;
     /** Whether mute and solo ramp the volume instead of cutting it. */
     fadeTransitions: boolean;
-    /** The player currently soloed, if any. */
-    soloedPlayerId: number | null;
+    /** The players currently soloed, empty when nothing is. */
+    soloedPlayerIds: number[];
+    /** The last player selected. Outlined in yellow, and the target of single-player actions. */
+    focusedPlayerId: number | null;
 }
 
 /**
@@ -67,8 +69,17 @@ export interface StackActions {
     setFadeTransitions: React.Dispatch<React.SetStateAction<boolean>>;
     /** Silences a player if it is audible, restores it if it is not. */
     toggleMute: (playerId: number) => void;
-    /** Silences every other playing player, or restores them if this player is already soloed. */
-    toggleSolo: (playerId: number) => void;
+    /** Silences everything playing outside the given players, or restores them if already soloed. */
+    toggleSolo: (playerIds: number[]) => void;
+    /** Selects one player and nothing else, focusing it. */
+    selectOnly: (playerId: number) => void;
+    /** Adds or removes one player, focusing it when it becomes selected. */
+    toggleSelected: (playerId: number) => void;
+    /** Set operations. None of them names a player, so focus is left where it was. */
+    selectAll: () => void;
+    selectNone: () => void;
+    invertSelection: () => void;
+    selectByPlayState: (playing: boolean) => void;
     clearPreset: () => void;
     savePersistPresetPref: (preference: boolean) => void;
 }
@@ -94,15 +105,16 @@ export const StackControlsProvider = ({ children, playerCount = DEFAULT_PLAYER_C
     );
     const [disablePersistPreset, setDisablePersistPreset] = useState(GLOBAL_DISABLE_SAVE_PRESET);
     const [fadeTransitions, setFadeTransitions] = useState(false);
-    const [soloedPlayerId, setSoloedPlayerId] = useState<number | null>(null);
+    const [soloedPlayerIds, setSoloedPlayerIds] = useState<number[]>([]);
+    const [focusedPlayerId, setFocusedPlayerId] = useState<number | null>(null);
 
     const { holders } = usePlayerHolder();
 
     // toggleMute and toggleSolo have to keep stable identities, or the actions context would change
     // on every volume tick and undo the whole point of splitting it from state. They read the live
     // values through this ref instead of closing over them.
-    const liveRef = useRef({ presetState, localVolumes, fadeAnimations, holders, fadeTransitions, soloedPlayerId });
-    liveRef.current = { presetState, localVolumes, fadeAnimations, holders, fadeTransitions, soloedPlayerId };
+    const liveRef = useRef({ presetState, localVolumes, fadeAnimations, holders, fadeTransitions, soloedPlayerIds });
+    liveRef.current = { presetState, localVolumes, fadeAnimations, holders, fadeTransitions, soloedPlayerIds };
 
     // Which players the current solo silenced, so un-soloing restores exactly those and leaves
     // anything the user had already muted alone.
@@ -162,35 +174,43 @@ export const StackControlsProvider = ({ children, playerCount = DEFAULT_PLAYER_C
         setPlayerSilenced(playerId, volume > 0);
     }, [setPlayerSilenced]);
 
-    const toggleSolo = useCallback((playerId: number) => {
+    /**
+     * Solo works on a set, not a single player: with several selected it silences everything playing
+     * outside that set, which is the same operation one player at a time.
+     */
+    const toggleSolo = useCallback((playerIds: number[]) => {
         const live = liveRef.current;
+        const target = [...playerIds].sort((a, b) => a - b);
+        const current = [...soloSilencedRef.current];
 
-        // Un-solo: give back everything this solo took away
-        if (live.soloedPlayerId === playerId) {
-            soloSilencedRef.current.forEach(id => setPlayerSilenced(id, false));
+        const alreadySoloed = live.soloedPlayerIds.length === target.length
+            && live.soloedPlayerIds.every((id, i) => id === target[i]);
+
+        if (alreadySoloed || target.length === 0) {
+            current.forEach(id => setPlayerSilenced(id, false));
             soloSilencedRef.current = [];
-            setSoloedPlayerId(null);
+            setSoloedPlayerIds([]);
             return;
         }
 
-        // Moving the solo to another player. Restoring everything and re-silencing would read
-        // volumes that have not been dispatched yet, so only the two players that actually change
-        // are touched: the new target comes back, the old one goes quiet.
-        if (live.soloedPlayerId !== null) {
-            setPlayerSilenced(playerId, false);
-            setPlayerSilenced(live.soloedPlayerId, true);
-
-            const stillSilenced = soloSilencedRef.current.filter(id => id !== playerId);
-            if (!stillSilenced.includes(live.soloedPlayerId)) stillSilenced.push(live.soloedPlayerId);
-            soloSilencedRef.current = stillSilenced;
-
-            setSoloedPlayerId(playerId);
-            return;
-        }
-
+        // Anything the previous solo silenced that belongs to the new set comes back; anything
+        // playing outside the new set goes quiet. Only the difference is touched, because a full
+        // restore would read volumes that have not been dispatched yet.
         const silenced: number[] = [];
+
         live.presetState.players.forEach((_, id) => {
-            if (id === playerId) return;
+            const inTarget = target.includes(id);
+            const wasSilenced = current.includes(id);
+
+            if (inTarget) {
+                if (wasSilenced) setPlayerSilenced(id, false);
+                return;
+            }
+
+            if (wasSilenced) {
+                silenced.push(id);
+                return;
+            }
 
             const other = live.holders[id]?.player;
             // Only players actually making sound. Restoring calls playVideo, which would otherwise
@@ -203,8 +223,69 @@ export const StackControlsProvider = ({ children, playerCount = DEFAULT_PLAYER_C
         });
 
         soloSilencedRef.current = silenced;
-        setSoloedPlayerId(playerId);
+        setSoloedPlayerIds(target);
     }, [setPlayerSilenced]);
+
+    // ------- SELECTION -------
+    // Routed through here rather than dispatched from components, so "the last player selected"
+    // has one place to be recorded.
+    const selectOnly = useCallback((playerId: number) => {
+        liveRef.current.presetState.players.forEach((player, index) => {
+            const shouldSelect = index === playerId;
+            if (player.selected === shouldSelect) return;
+            presetDispatch({ type: shouldSelect ? 'select' : 'deselect', index });
+        });
+        setFocusedPlayerId(playerId);
+    }, [presetDispatch]);
+
+    const toggleSelected = useCallback((playerId: number) => {
+        const wasSelected = liveRef.current.presetState.players[playerId]?.selected ?? false;
+        presetDispatch({ type: wasSelected ? 'deselect' : 'select', index: playerId });
+        if (!wasSelected) setFocusedPlayerId(playerId);
+    }, [presetDispatch]);
+
+    const selectAll = useCallback(() => {
+        liveRef.current.presetState.players.forEach((player, index) => {
+            if (!player.selected) presetDispatch({ type: 'select', index });
+        });
+    }, [presetDispatch]);
+
+    const selectNone = useCallback(() => {
+        liveRef.current.presetState.players.forEach((player, index) => {
+            if (player.selected) presetDispatch({ type: 'deselect', index });
+        });
+    }, [presetDispatch]);
+
+    const invertSelection = useCallback(() => {
+        liveRef.current.presetState.players.forEach((player, index) => {
+            presetDispatch({ type: player.selected ? 'deselect' : 'select', index });
+        });
+    }, [presetDispatch]);
+
+    const selectByPlayState = useCallback((playing: boolean) => {
+        const live = liveRef.current;
+        live.presetState.players.forEach((player, index) => {
+            const state = live.holders[index]?.player?.getPlayerState?.();
+            const isPlaying = state === YT.PlayerState.PLAYING;
+            const shouldSelect = isPlaying === playing;
+            if (player.selected === shouldSelect) return;
+            presetDispatch({ type: shouldSelect ? 'select' : 'deselect', index });
+        });
+    }, [presetDispatch]);
+
+    /**
+     * Focus only ever points at a selected player.
+     *
+     * Enforced here rather than in each action because there are six ways to deselect - the row
+     * click, the digit keys, none, invert, select-by-play-state, and a restored preset - and every
+     * one of them would otherwise need to remember the rule.
+     */
+    useEffect(() => {
+        if (focusedPlayerId === null) return;
+        if (presetState.players[focusedPlayerId]?.selected) return;
+
+        setFocusedPlayerId(null);
+    }, [presetState.players, focusedPlayerId]);
 
     // Derived from masterVolume rather than mirrored in state - a second useState here meant every
     // master volume change cost two renders and could be read one render stale in between.
@@ -269,7 +350,8 @@ export const StackControlsProvider = ({ children, playerCount = DEFAULT_PLAYER_C
             fadeAnimations,
             disablePersistPreset,
             fadeTransitions,
-            soloedPlayerId,
+            soloedPlayerIds,
+            focusedPlayerId,
         }),
         [
             presetState,
@@ -279,7 +361,8 @@ export const StackControlsProvider = ({ children, playerCount = DEFAULT_PLAYER_C
             fadeAnimations,
             disablePersistPreset,
             fadeTransitions,
-            soloedPlayerId,
+            soloedPlayerIds,
+            focusedPlayerId,
         ],
     );
 
@@ -295,10 +378,27 @@ export const StackControlsProvider = ({ children, playerCount = DEFAULT_PLAYER_C
             setFadeTransitions,
             toggleMute,
             toggleSolo,
+            selectOnly,
+            toggleSelected,
+            selectAll,
+            selectNone,
+            invertSelection,
+            selectByPlayState,
             clearPreset,
             savePersistPresetPref,
         }),
-        [presetDispatch, debouncedPresetDispatch, toggleMute, toggleSolo],
+        [
+            presetDispatch,
+            debouncedPresetDispatch,
+            toggleMute,
+            toggleSolo,
+            selectOnly,
+            toggleSelected,
+            selectAll,
+            selectNone,
+            invertSelection,
+            selectByPlayState,
+        ],
     );
 
     return (

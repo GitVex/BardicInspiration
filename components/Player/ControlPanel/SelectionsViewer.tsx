@@ -13,18 +13,10 @@ import { useVideoTitle } from '../hooks/useVideoTitle';
  */
 function SelectionsViewer() {
     const { presetState } = useStackState();
-    const { presetDispatch } = useStackActions();
+    const { selectAll, selectNone, invertSelection } = useStackActions();
 
     const players = presetState.players;
     const selectedCount = players.filter(player => player.selected).length;
-
-    const setAll = (selected: boolean) =>
-        players.forEach((_, index) =>
-            presetDispatch({ type: selected ? 'select' : 'deselect', index }));
-
-    const invert = () =>
-        players.forEach((player, index) =>
-            presetDispatch({ type: player.selected ? 'deselect' : 'select', index }));
 
     return (
         <div className="flex w-full min-h-0 flex-col gap-1">
@@ -40,13 +32,13 @@ function SelectionsViewer() {
             </div>
 
             <div className="flex flex-row gap-1">
-                <SelectionActionButton onClick={() => setAll(true)} disabled={selectedCount === players.length}>
+                <SelectionActionButton onClick={selectAll} disabled={selectedCount === players.length}>
                     All
                 </SelectionActionButton>
-                <SelectionActionButton onClick={() => setAll(false)} disabled={selectedCount === 0}>
+                <SelectionActionButton onClick={selectNone} disabled={selectedCount === 0}>
                     None
                 </SelectionActionButton>
-                <SelectionActionButton onClick={invert}>Invert</SelectionActionButton>
+                <SelectionActionButton onClick={invertSelection}>Invert</SelectionActionButton>
             </div>
         </div>
     );
@@ -70,7 +62,8 @@ function SelectionActionButton(
 }
 
 function SelectionRow({ index, selected, videoId }: { index: number; selected: boolean; videoId: string }) {
-    const { presetDispatch } = useStackActions();
+    const { toggleSelected } = useStackActions();
+    const { focusedPlayerId } = useStackState();
     const { holders } = usePlayerHolder();
 
     const { track } = useTrackByVideoId(videoId);
@@ -79,10 +72,12 @@ function SelectionRow({ index, selected, videoId }: { index: number; selected: b
     return (
         <button
             className={`flex w-full flex-row items-center gap-2 rounded border px-1.5 py-1 text-left
-                        transition-colors ${selected
-                ? 'border-red-500/70 bg-red-900/20'
-                : 'border-darknavy-700 bg-darknavy-500 hover:bg-darknavy-400/30'}`}
-            onClick={() => presetDispatch({ type: selected ? 'deselect' : 'select', index })}
+                        transition-colors ${focusedPlayerId === index
+                ? 'border-yellow-400/80 bg-yellow-400/10'
+                : selected
+                    ? 'border-red-500/70 bg-red-900/20'
+                    : 'border-darknavy-700 bg-darknavy-500 hover:bg-darknavy-400/30'}`}
+            onClick={() => toggleSelected(index)}
             title={title}
         >
             {/* The track's own colour, so a row is findable by the same tint as its card */}
