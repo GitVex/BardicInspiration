@@ -13,7 +13,12 @@ import React, { useCallback, useEffect, useState } from 'react';
 function PlayerComponent() {
     const { selected, setSelected, playerId, videoId, framePlayer, localVolume, setLocalVolume } =
         usePlayerControls();
+    const { focusedPlayerId } = useStackState();
     const { registerSlot } = usePlayerHolder();
+
+    // The focused player is by definition selected - it is the last one selected - so yellow wins
+    // over the red the rest of the selection carries.
+    const focused = focusedPlayerId === playerId;
     const [showSettings, setShowSettings] = useState(false); // Toggle for Video ID
 
     // Only tracks in the library carry a colour, so a video loaded by id that was never submitted
@@ -34,8 +39,12 @@ function PlayerComponent() {
             className="group relative flex h-full w-full min-h-0 min-w-0 flex-row overflow-hidden rounded-xl border border-white/10 bg-gray-900 shadow-xl"
             animate={{
                 // Subtle glow instead of harsh red border
-                borderColor: selected ? 'rgba(239, 68, 68, 0.8)' : 'rgba(255, 255, 255, 0.1)',
-                boxShadow: selected ? '0 0 15px rgba(239, 68, 68, 0.2)' : 'none',
+                borderColor: focused
+                    ? 'rgba(250, 204, 21, 0.9)'
+                    : selected ? 'rgba(239, 68, 68, 0.8)' : 'rgba(255, 255, 255, 0.1)',
+                boxShadow: focused
+                    ? '0 0 15px rgba(250, 204, 21, 0.25)'
+                    : selected ? '0 0 15px rgba(239, 68, 68, 0.2)' : 'none',
             }}
             onClick={(e) => {
                 if (e.currentTarget === e.target) setSelected();
@@ -377,11 +386,11 @@ function FadeOutButton() {
  */
 function TransportButtons() {
     const { framePlayer, playerId, localVolume } = usePlayerControls();
-    const { soloedPlayerId, fadeTransitions } = useStackState();
+    const { soloedPlayerIds, fadeTransitions } = useStackState();
     const { toggleMute, toggleSolo } = useStackActions();
 
     const muted = localVolume <= 0;
-    const soloed = soloedPlayerId === playerId;
+    const soloed = soloedPlayerIds.includes(playerId);
     const verb = fadeTransitions ? 'Fade' : 'Cut';
 
     return (
@@ -396,7 +405,7 @@ function TransportButtons() {
             </button>
             <button
                 className={`${buttonClass} flex-1 ${soloed ? 'bg-red-800/70 hover:bg-red-700/70' : ''}`}
-                onClick={() => toggleSolo(playerId)}
+                onClick={() => toggleSolo([playerId])}
                 disabled={!framePlayer}
                 title={soloed ? 'Bring the other players back' : `${verb} every other playing player out`}
             >
