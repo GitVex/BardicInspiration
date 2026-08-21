@@ -372,27 +372,33 @@ function FadeOutButton() {
 }
 
 /**
- * Transport pair. Both are inert for now - mute has to decide whether it pauses the player or only
- * silences it, and solo needs to know every other player's level to restore them afterwards.
+ * Transport pair. Both operate on the stack rather than this player alone - solo has to reach
+ * every other player - so the work lives in StackControls and this only reflects the result.
  */
 function TransportButtons() {
-    const { framePlayer } = usePlayerControls();
+    const { framePlayer, playerId, localVolume } = usePlayerControls();
+    const { soloedPlayerId, fadeTransitions } = useStackState();
+    const { toggleMute, toggleSolo } = useStackActions();
+
+    const muted = localVolume <= 0;
+    const soloed = soloedPlayerId === playerId;
+    const verb = fadeTransitions ? 'Fade' : 'Cut';
 
     return (
         <div className="flex shrink-0 flex-row gap-1">
             <button
-                className={`${buttonClass} flex-1`}
-                onClick={() => {/* mute / pause this player */}}
+                className={`${buttonClass} flex-1 ${muted ? 'bg-red-800/70 hover:bg-red-700/70' : ''}`}
+                onClick={() => toggleMute(playerId)}
                 disabled={!framePlayer}
-                title="Mute / pause"
+                title={muted ? 'Unmute' : `${verb} this player out`}
             >
-                Mute
+                {muted ? 'Unmute' : 'Mute'}
             </button>
             <button
-                className={`${buttonClass} flex-1`}
-                onClick={() => {/* duck every other player */}}
+                className={`${buttonClass} flex-1 ${soloed ? 'bg-red-800/70 hover:bg-red-700/70' : ''}`}
+                onClick={() => toggleSolo(playerId)}
                 disabled={!framePlayer}
-                title="Solo - duck every other player"
+                title={soloed ? 'Bring the other players back' : `${verb} every other playing player out`}
             >
                 Solo
             </button>
