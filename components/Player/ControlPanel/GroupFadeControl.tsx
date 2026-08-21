@@ -84,7 +84,6 @@ function createGroupFadeHandler(
 
 function GroupFadeControl({ initialLoadDone }: { initialLoadDone: boolean }) {
     const { holders } = usePlayerHolder();
-    const disable = !initialLoadDone;
 
     // Filter out null framedPlayers early. Memoised on holders, because .map().filter() built a
     // new array every render, which changed the identity the handlers below key off and made
@@ -108,17 +107,20 @@ function GroupFadeControl({ initialLoadDone }: { initialLoadDone: boolean }) {
         [framedPlayers, controls],
     );
 
-    return (
-        <div>
-            <div className="flex flex-row gap-2 rounded border-2 border-darknavy-700 bg-darknavy-500 p-2">
-                <ControlPanelButton onClick={handleGroupFadeIn} disabled={disable}>
-                    Fade In
-                </ControlPanelButton>
+    // Naming the count is the point of the redesign: the buttons act on the selection above them,
+    // and there was previously nothing tying the two together.
+    const selectedCount = controls.presetState.players.filter(player => player.selected).length;
+    const disable = !initialLoadDone || selectedCount === 0;
 
-                <ControlPanelButton onClick={handleGroupFadeOut} disabled={disable}>
-                    Fade Out
-                </ControlPanelButton>
-            </div>
+    return (
+        <div className="flex w-full flex-row gap-2">
+            <ControlPanelButton onClick={handleGroupFadeIn} disabled={disable}>
+                Fade In {selectedCount > 0 && `(${selectedCount})`}
+            </ControlPanelButton>
+
+            <ControlPanelButton onClick={handleGroupFadeOut} disabled={disable}>
+                Fade Out {selectedCount > 0 && `(${selectedCount})`}
+            </ControlPanelButton>
         </div>
     );
 }

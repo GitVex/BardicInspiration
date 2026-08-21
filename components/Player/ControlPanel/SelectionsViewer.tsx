@@ -1,50 +1,97 @@
-import { motion } from 'framer-motion';
 import React from 'react';
 import { useStackActions, useStackState } from '../../Contexts/StackControlsProvider';
+import { usePlayerHolder } from '../../Contexts/PlayerHolderProvider';
+import { useTrackByVideoId } from '../hooks/useTrackByVideoId';
+import { useVideoTitle } from '../hooks/useVideoTitle';
 
+/**
+ * The list the group actions act on.
+ *
+ * This used to be eight unlabelled boxes mirroring the player grid's 2x4 geometry, which meant
+ * reading it required counting positions against the grid beside it. Naming each row makes it a
+ * mixer strip list instead of a mini-map, and puts the group actions next to what they operate on.
+ */
 function SelectionsViewer() {
-    const { presetState: preset } = useStackState();
-    const { presetDispatch: dispatch } = useStackActions();
-    const players = preset.players;
+    const { presetState } = useStackState();
+    const { presetDispatch } = useStackActions();
+
+    const players = presetState.players;
+    const selectedCount = players.filter(player => player.selected).length;
+
+    const setAll = (selected: boolean) =>
+        players.forEach((_, index) =>
+            presetDispatch({ type: selected ? 'select' : 'deselect', index }));
+
+    const invert = () =>
+        players.forEach((player, index) =>
+            presetDispatch({ type: player.selected ? 'deselect' : 'select', index }));
 
     return (
-        <div className="">
-            <div className="flex flex-col items-center">
-                <div
-                    className="grid grid-cols-2 grid-rows-4 gap-2 rounded border-2 border-darknavy-700 bg-darknavy-500 p-4">
-                    {players.map((player, index) => (
-                        <div key={index} className={`relative flex h-8 w-10 rounded bg-transparent`}>
-                            <motion.div
-                                className={`absolute top-0 left-0 flex h-8 w-10 rounded`}
-                                animate={{
-                                    boxShadow: player.selected ? '0 0 8px 3px #f00' : '0 0 0 0px #f00',
-                                }}
-                                transition={{
-                                    duration: 0.2,
-                                }}
-                            />
-                            <div
-                                className={`absolute top-0 left-0 flex h-8 w-10 rounded bg-transparent shadow-[inset_0_0_12px_rgba(108,117,130,1)]`}
-                                onClick={() => {
-                                    if (player.selected) {
-                                        dispatch({
-                                            type: 'deselect',
-                                            index: index,
-                                        });
-                                    } else {
-                                        dispatch({
-                                            type: 'select',
-                                            index: index,
-                                        });
-                                    }
-                                }}
-                            />
-                        </div>
-                    ))}
-                </div>
+        <div className="flex w-full min-h-0 flex-col gap-1">
+            <div className="flex flex-row items-baseline justify-between px-0.5">
+                <span className="text-sm font-semibold">Players</span>
+                <span className="text-xs text-gray-400">{selectedCount} selected</span>
+            </div>
+
+            <div className="flex min-h-0 flex-col gap-1 overflow-y-auto">
+                {players.map((player, index) => (
+                    <SelectionRow key={index} index={index} selected={player.selected} videoId={player.videoId} />
+                ))}
+            </div>
+
+            <div className="flex flex-row gap-1">
+                <SelectionActionButton onClick={() => setAll(true)} disabled={selectedCount === players.length}>
+                    All
+                </SelectionActionButton>
+                <SelectionActionButton onClick={() => setAll(false)} disabled={selectedCount === 0}>
+                    None
+                </SelectionActionButton>
+                <SelectionActionButton onClick={invert}>Invert</SelectionActionButton>
             </div>
         </div>
     );
 }
 
 export default SelectionsViewer;
+
+function SelectionActionButton(
+    { onClick, disabled = false, children }: { onClick: () => void; disabled?: boolean; children: React.ReactNode },
+) {
+    return (
+        <button
+            className="flex-1 rounded border border-darknavy-700 bg-darknavy-500 px-1 py-0.5 text-xs
+                       hover:bg-darknavy-400/40 disabled:opacity-40 transition-colors"
+            onClick={onClick}
+            disabled={disabled}
+        >
+            {children}
+        </button>
+    );
+}
+
+function SelectionRow({ index, selected, videoId }: { index: number; selected: boolean; videoId: string }) {
+    const { presetDispatch } = useStackActions();
+    const { holders } = usePlayerHolder();
+
+    const { track } = useTrackByVideoId(videoId);
+    const title = useVideoTitle(holders[index]?.player ?? null, videoId, track?.title);
+
+    return (
+        <button
+            className={`flex w-full flex-row items-center gap-2 rounded border px-1.5 py-1 text-left
+                        transition-colors ${selected
+                ? 'border-red-500/70 bg-red-900/20'
+                : 'border-darknavy-700 bg-darknavy-500 hover:bg-darknavy-400/30'}`}
+            onClick={() => presetDispatch({ type: selected ? 'deselect' : 'select', index })}
+            title={title}
+        >
+            {/* The track's own colour, so a row is findable by the same tint as its card */}
+            <span
+                className="h-3 w-1 shrink-0 rounded-full"
+                style={{ backgroundColor: track?.color ?? 'transparent' }}
+            />
+            <span className="w-3 shrink-0 text-xs text-gray-400">{index + 1}</span>
+            <span className="min-w-0 flex-1 truncate text-xs">{title}</span>
+        </button>
+    );
+}

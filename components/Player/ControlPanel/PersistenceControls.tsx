@@ -24,7 +24,7 @@ function PersistenceControls({ initialLoadDone }: PersistenceControlsProps) {
 
     return (
         <div>
-            <div className="flex flex-row gap-2 rounded border-2 border-darknavy-700 bg-darknavy-500 p-2">
+            <div className="flex flex-row gap-2">
                 <ControlPanelButton onClick={switchPersistPreset} disabled={disable}>
                     {disablePersistPreset ? 'Enable' : 'Disable'} Persistence
                 </ControlPanelButton>
