@@ -14,3 +14,13 @@ export function getVideoIdFromYoutubeUrl(url: string) {
 	}
 	return match[1];
 }
+
+/**
+ * Collapses any accepted youtube url shape down to one canonical form: the plain watch url with
+ * only the id, stripping tracking/playback params like `t`, `si`, `list` or `ab_channel` that
+ * don't change which video loads but multiply how many distinct urls point at the same track.
+ */
+export function normalizeYoutubeUrl(url: string) {
+	const videoId = getVideoIdFromYoutubeUrl(url);
+	return `https://www.youtube.com/watch?v=${videoId}`;
+}
