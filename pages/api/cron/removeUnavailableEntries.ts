@@ -1,82 +1,155 @@
-import { prisma } from '../../../utils/prismaClientProvider';
-import { checkImageAvailability } from '../creator/calculateColor';
+/*
+ * Nightly pruning job: removes tracks whose YouTube video is gone or unplayable.
+ *
+ * This job deletes rows, so every uncertain case is resolved in favour of keeping the track:
+ * a url we cannot parse, an id YouTube refuses to answer for, or a run whose candidate list is
+ * implausibly large all leave the table untouched.
+ */
 import { NextApiRequest, NextApiResponse } from 'next';
-import { assertCronAuthorized, createRoute } from '../../../utils/api/handler';
+import { prisma } from '../../../utils/prismaClientProvider';
+import { ApiError, assertCronAuthorized, createRoute } from '../../../utils/api/handler';
+import { getVideoIdFromYoutubeUrl } from '../../../utils/youtubeUrl';
+import {
+    deletionLimit,
+    unavailabilityReason,
+    YoutubeVideo,
+} from '../../../utils/api/videoAvailability';
+
+/** The videos endpoint takes up to 50 ids per call - one call per 50 rows instead of per row. */
+const YOUTUBE_BATCH_SIZE = 50;
+
+interface TrackRow {
+    track_id: number;
+    url: string;
+    title: string;
+}
+
+function chunk<T>(items: T[], size: number): T[][] {
+    const batches: T[][] = [];
+    for (let i = 0; i < items.length; i += size) {
+        batches.push(items.slice(i, i + size));
+    }
+    return batches;
+}
+
+/**
+ * Looks up every id in one batched pass. A failed request aborts the whole run: an empty result
+ * is indistinguishable from "all of these videos are gone", and acting on it would clear the
+ * table.
+ */
+async function fetchVideos(ids: string[], apiKey: string): Promise<Map<string, YoutubeVideo>> {
+    const byId = new Map<string, YoutubeVideo>();
+
+    for (const batch of chunk(ids, YOUTUBE_BATCH_SIZE)) {
+        const response = await fetch(
+            `https://www.googleapis.com/youtube/v3/videos?part=status,contentDetails&id=${batch.join(
+                ',',
+            )}&key=${apiKey}`,
+        );
+
+        if (!response.ok) {
+            throw new ApiError(
+                502,
+                `YouTube API responded ${response.status} - aborting without deleting anything`,
+            );
+        }
+
+        const data = await response.json();
+
+        if (!Array.isArray(data?.items)) {
+            throw new ApiError(502, 'YouTube API returned no items array - aborting');
+        }
+
+        for (const item of data.items as YoutubeVideo[]) {
+            byId.set(item.id, item);
+        }
+    }
+
+    return byId;
+}
 
 export default createRoute(['GET', 'POST'], async (req: NextApiRequest, res: NextApiResponse) => {
     assertCronAuthorized(req);
 
-    // first get all track urls
-    const allTracks = await prisma.track.findMany({
-        select: {
-            track_id: true,
-            url: true,
-        },
+    const apiKey = process.env.YOUTUBE_API_KEY;
+    if (!apiKey) {
+        throw new ApiError(500, 'YOUTUBE_API_KEY is not set');
+    }
+
+    // `?dryRun=1` runs the full check and reports the verdict without touching the table.
+    const dryRun = req.query.dryRun === '1' || req.query.dryRun === 'true';
+
+    const allTracks: TrackRow[] = await prisma.track.findMany({
+        select: { track_id: true, url: true, title: true },
     });
 
-    // go through each track and check if it is region blocked OR the thumbnail image is unretrievable. Use Promise.all to make it faster
-    // trying to retrieve the thumbnail image of a video is appearently a good enough way to check for availability
-    let blockedTracks = await Promise.all(
-        allTracks.map(async (entry) => {
-            const response = await fetch(
-                `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${
-                    entry.url.split('?v=')[1]
-                }&key=${process.env.YOUTUBE_API_KEY}`,
-            );
-            const data = await response.json();
+    // Urls that yield no id are left alone and reported - a parsing gap must never read as
+    // "this video is gone".
+    const unparsable: TrackRow[] = [];
+    const resolved: Array<TrackRow & { videoId: string }> = [];
 
-            let thumbn_blocked = false;
-            try {
-                await checkImageAvailability(entry.url);
-            } catch (error) {
-                thumbn_blocked = true;
-            }
+    for (const track of allTracks) {
+        try {
+            resolved.push({ ...track, videoId: getVideoIdFromYoutubeUrl(track.url) });
+        } catch {
+            unparsable.push(track);
+        }
+    }
 
-            if (data.items[0]?.contentDetails?.regionRestriction?.blocked) {
-                return {
-                    ...entry,
-                    ...data.items[0].contentDetails.regionRestriction,
-                };
-            } else if (thumbn_blocked) {
-                return {
-                    ...entry,
-                    blocked: 'thumbnail',
-                };
-            } else {
-                return 'valid';
-            }
-        }),
+    const videos = await fetchVideos(
+        Array.from(new Set(resolved.map((track) => track.videoId))),
+        apiKey,
     );
 
-    // filter out all valid urls
-    blockedTracks = blockedTracks.filter((entry) => entry !== 'valid' && entry.blocked.length > 2 && entry.blocked !== 'thumbnail');
+    const unavailable = resolved
+        .map((track) => ({ track, reason: unavailabilityReason(videos.get(track.videoId)) }))
+        .filter((entry): entry is { track: TrackRow & { videoId: string }; reason: string } =>
+            entry.reason !== null,
+        );
 
-    // NOTE: this job currently reports what it *would* remove and deletes nothing. The map below
-    // never awaits (or returns) prisma.track.delete, and reads entry.id where the column is
-    // track_id, so no row is ever removed. Left as-is deliberately - switching it on is a
-    // destructive change that wants its own review, and the log entry that would record the
-    // deletion is still commented out.
-    const tracksToBeDeleted = blockedTracks;
+    const summary = {
+        checked: resolved.length,
+        skippedUnparsableUrls: unparsable.map((track) => track.url),
+        candidates: unavailable.map(({ track, reason }) => ({
+            track_id: track.track_id,
+            title: track.title,
+            url: track.url,
+            reason,
+        })),
+    };
 
-    // create new log entry to document the deletion
-    /*await prisma.log.create({
-        data: {
-            time: new Date(),
-            type: 'cron',
-            message: `Deleted ${tracksToBeDeleted.length} entry(s)`,
-            history: JSON.stringify(tracksToBeDeleted),
-        },
-    });*/
+    const limit = deletionLimit(allTracks.length);
+    if (unavailable.length > limit) {
+        throw new ApiError(
+            409,
+            `${unavailable.length} of ${allTracks.length} tracks look unavailable, over the ${limit} row safety limit - deleted nothing`,
+        );
+    }
 
-    const deletedTracks = await Promise.all(
-        tracksToBeDeleted.map(async (entry) => {
-            prisma.track.delete({
-                where: {
-                    track_id: entry.id,
-                },
-            });
-        }),
+    if (dryRun || unavailable.length === 0) {
+        res.status(200).json({ ...summary, deleted: 0, dryRun });
+        return;
+    }
+
+    // Delete and log together: a run that removes rows without leaving a record of what it took
+    // is unrecoverable, since there is no soft delete to fall back on.
+    const history = unavailable.map(
+        ({ track, reason }) => `${track.track_id} | ${track.url} | ${track.title} | ${reason}`,
     );
 
-    res.status(200).json(deletedTracks);
+    await prisma.$transaction([
+        prisma.track.deleteMany({
+            where: { track_id: { in: unavailable.map(({ track }) => track.track_id) } },
+        }),
+        prisma.log.create({
+            data: {
+                time: new Date(),
+                type: 'cron',
+                message: `Deleted ${unavailable.length} entry(s)`,
+                history,
+            },
+        }),
+    ]);
+
+    res.status(200).json({ ...summary, deleted: unavailable.length, dryRun: false });
 });

@@ -1,6 +1,7 @@
 import React from 'react';
 import { PlayerStateAction } from '../Player/Contexts/states';
 import IFPlayer from '../Player/types/IFPlayer';
+import { getVideoIdFromYoutubeUrl } from '../../utils/youtubeUrl';
 
 function findExtremeIndex(
 	array: number[],
@@ -25,16 +26,6 @@ function findExtremeIndex(
 
 export function argMin(array: number[]): number {
 	return findExtremeIndex(array, (a, b) => a < b);
-}
-
-function getVideoIdFromYoutubeUrl(url: string) {
-	const regex =
-		/(?:youtu\.be\/|youtube\.com(?:\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=|shorts\/)|youtu\.be\/|embed\/|v\/|m\/|watch\?(?:[^=]+=[^&]+&)*?v=))([^"&?\/\s]{11})/gm;
-	const match = regex.exec(url);
-	if (!match) {
-		throw new Error('Invalid youtube url');
-	}
-	return match[1];
 }
 
 export function transformToTarget(input: string) {
