@@ -6,6 +6,7 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - DIRECT_URL=${DIRECT_URL}
       - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
+      - CRON_SECRET=${CRON_SECRET}
     # ports:
     #   - "8080:3000"
     restart: always
