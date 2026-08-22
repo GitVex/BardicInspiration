@@ -3,6 +3,7 @@ import { prisma } from '../../../utils/prismaClientProvider';
 import { buildQuery } from '../../../utils/separateTags';
 import { getAverageColor } from './calculateColor';
 import { ApiError, createRoute, readOptionalString, readString } from '../../../utils/api/handler';
+import { normalizeYoutubeUrl } from '../../../utils/youtubeUrl';
 
 const FALLBACK_COLOR = '#000000';
 
@@ -12,8 +13,15 @@ export default createRoute(['POST'], async (req: NextApiRequest, res: NextApiRes
     const body = req.body ?? {};
     const title = readString(body.title, 'title');
     const author_name = readString(body.author_name, 'author_name');
-    const url = readString(body.url, 'url');
+    const rawUrl = readString(body.url, 'url');
     const provider_url = readString(body.provider_url, 'provider_url');
+
+    let url: string;
+    try {
+        url = normalizeYoutubeUrl(rawUrl);
+    } catch {
+        throw new ApiError(400, 'url must be a valid youtube link');
+    }
     const tags = readString(body.tags, 'tags');
     const thumbnail_url = readOptionalString(body.thumbnail_url);
 
