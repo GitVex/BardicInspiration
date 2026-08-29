@@ -16,7 +16,12 @@ services:
       - 'traefik.http.services.dev_bardicinspiration.loadbalancer.server.port=3000'
     networks:
       - traefik_web
+      - coolify
 
 networks:
   traefik_web:
     external: true
+  coolify:
+    external: true
+    name: coolify
+    attachable: true
