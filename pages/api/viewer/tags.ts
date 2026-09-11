@@ -7,9 +7,10 @@ export default createRoute(['POST'], async (req: NextApiRequest, res: NextApiRes
     // with no body at all threw before reaching the database.
     const params = readStringArray(req.body?.filter, 'filter');
 
-    const where = params.length > 0
-        ? { AND: params.map(tag => ({ tracks: { some: { tags: { some: { name: tag } } } } })) }
-        : {};
+    // Require all selected tags on the same track, not on separate related tracks.
+    const where = {
+        tracks: { some: { AND: params.map(tag => ({ tags: { some: { name: tag } } })) } },
+    };
 
     const tags = await prisma.tag.findMany({
         select: {
