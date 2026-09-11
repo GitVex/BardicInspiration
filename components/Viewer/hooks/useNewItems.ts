@@ -2,8 +2,8 @@
 import { useCallback } from 'react';
 import { useSWRConfig } from 'swr';
 import { usePaginatedItems } from './usePaginatedItems';
-
-export const NEW_ITEMS_ROUTE = '/api/viewer/new';
+import { invalidateNewItems, NEW_ITEMS_ROUTE } from './invalidateNewItems';
+export { NEW_ITEMS_ROUTE } from './invalidateNewItems';
 
 export function useNewItems(pageSize: number = 10) {
     return usePaginatedItems({
@@ -18,15 +18,12 @@ export function useNewItems(pageSize: number = 10) {
 /**
  * Revalidates every cached page of the new-items list, for use after creating a track.
  *
- * The matcher runs against the live cache when called, and `includes` catches both the individual
- * page keys and the `$inf$`-prefixed key that useSWRInfinite stores the list itself under - the
- * latter being the one that actually drives the refetch.
+ * Use exact infinite-list keys from this provider's cache. Predicate-based mutate
+ * skips those keys, and individual page entries do not drive the rendered list.
+ * useNewItems enables revalidateAll so every loaded page refreshes together.
  */
 export function useInvalidateNewItems() {
-    const { mutate } = useSWRConfig();
+    const { cache, mutate } = useSWRConfig();
 
-    return useCallback(
-        () => mutate(key => typeof key === 'string' && key.includes(NEW_ITEMS_ROUTE)),
-        [mutate],
-    );
+    return useCallback(() => invalidateNewItems(cache.keys(), key => mutate(key)), [cache, mutate]);
 }

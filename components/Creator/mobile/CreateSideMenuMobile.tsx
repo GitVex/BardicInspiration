@@ -1,68 +1,63 @@
 import { motion } from 'framer-motion';
-import React, { useState } from 'react';
+import { useState } from 'react';
+import FocusTrap from '@mui/material/Unstable_TrapFocus';
 import CreateUI from '../CreateUI';
 import { useWindowSize } from '../../Contexts/WindowSizeProvider';
 
-function CreateSideMenu() {
+export default function CreateSideMenuMobile() {
     const [isOpenCreate, setIsOpenCreate] = useState(false);
     const { windowHeight } = useWindowSize();
-
-    return (
+    return windowHeight ? (
         <>
-            {windowHeight && (
-                <>
+            <button
+                type="button"
+                aria-label="Open creator"
+                aria-expanded={isOpenCreate}
+                onClick={() => setIsOpenCreate(value => !value)}
+            >
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.2}
+                    stroke="currentColor"
+                    className="h-12 w-12 cursor-pointer rounded-full bg-darknavy-500 text-red-500"
+                >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+            </button>
+            <motion.div
+                className="fixed inset-0 z-50"
+                initial={{ y: '-110%' }}
+                transition={{ duration: 1, ease: 'easeInOut' }}
+                animate={{ y: isOpenCreate ? '0%' : '-110%' }}
+                aria-hidden={!isOpenCreate}
+                style={{ pointerEvents: isOpenCreate ? 'auto' : 'none' }}
+                onKeyDown={event => {
+                    if (event.key === 'Escape') {
+                        event.stopPropagation();
+                        setIsOpenCreate(false);
+                    }
+                }}
+            >
+                <FocusTrap open={isOpenCreate}>
                     <div
-                        onClick={() =>
-                            setIsOpenCreate((prevIsOpenCreate) => !prevIsOpenCreate)
-                        }
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Add track"
+                        tabIndex={-1}
+                        style={{ height: '100dvh' }}
+                        ref={node => {
+                            if (node) {
+                                if (isOpenCreate) node.removeAttribute('inert');
+                                else node.setAttribute('inert', '');
+                            }
+                        }}
                     >
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            strokeWidth={1.2}
-                            stroke="currentColor"
-                            className="h-12 w-12 cursor-pointer text-red-500 rounded-full bg-darknavy-500"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M12 4.5v15m7.5-7.5h-15"
-                            />
-                        </svg>
+                        <CreateUI onClose={() => setIsOpenCreate(false)} isOpen={isOpenCreate} />
                     </div>
-                    <motion.div
-                        className={`absolute z-10 top-0`}
-                        initial={{ y: -windowHeight - 100 }}
-                        transition={{ duration: 1, ease: 'easeInOut' }}
-                        animate={isOpenCreate ? { y: 0 } : { y: -windowHeight - 100 }}
-                    >
-                        <div className={'relative backdrop-blur-md h-screen w-screen'}
-                        >
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                strokeWidth={1.2}
-                                stroke="currentColor"
-                                className="absolute h-12 w-12 cursor-pointer text-red-500 right-4 top-4 rounded-full bg-darknavy-500"
-                                onClick={() => setIsOpenCreate(false)}
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M12 4.5v15m7.5-7.5h-15"
-                                    style={{ transformOrigin: '50% 50%', transform: 'rotate(45deg)' }}
-                                />
-                            </svg>
-                            <CreateUI />
-                        </div>
-                    </motion.div>
-                </>
-            )
-            }
+                </FocusTrap>
+            </motion.div>
         </>
-    );
+    ) : null;
 }
-
-export default CreateSideMenu;

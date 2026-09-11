@@ -1,67 +1,55 @@
-import React, { useState, useEffect } from 'react';
-import { IVideoData } from '../types/IVideoData';
-import { validateUrl } from './utils';
+import { useRef, useState } from 'react';
+import { useSWRConfig } from 'swr';
 import { useInvalidateNewItems } from '../../Viewer/hooks/useNewItems';
+import { IVideoData } from '../types/IVideoData';
 
-const useFormSubmit = (url: string, tags: string, focussedVideo: IVideoData | null, isPresent: boolean) => {
-    const [isSubmittable, setIsSubmittable] = useState(false);
+export default function useFormSubmit() {
     const [isLoading, setIsLoading] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
-    // Not useNewItems(): reaching the helper through it mounted a second paginated subscription,
-    // at the default page size rather than the 30 the list renders with
+    const [success, setSuccess] = useState<string | null>(null);
+    const busy = useRef(false);
     const invalidateNewItems = useInvalidateNewItems();
+    const { mutate } = useSWRConfig();
 
-    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-
-        if (!url || !validateUrl(url)) {
-            return;
-        }
-
+    const submit = async (url: string, tags: string[], video: IVideoData): Promise<boolean> => {
+        if (busy.current) return false;
+        busy.current = true;
         setIsLoading(true);
         setSubmitError(null);
-
+        setSuccess(null);
         try {
-            const res = await fetch('/api/creator/create', {
+            const response = await fetch('/api/creator/create', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    ...focussedVideo,
-                    tags,
-                    url,
-                }),
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...video, url, tags: tags.join(',') }),
             });
-
-            // fetch only rejects on network failure, so a 500 from the route - a duplicate url,
-            // a failed artist upsert - would otherwise read as success. Revalidating after one of
-            // those returns the same rows it already had, which looks like the refetch is broken
-            // when nothing was ever created.
-            if (!res.ok) {
-                const body = await res.text();
-                throw new Error(`create failed: ${res.status} ${res.statusText} ${body}`);
+            if (!response.ok) {
+                const body = await response.json().catch(() => null);
+                throw new Error(body?.error || 'Could not add the track. Please try again.');
             }
-
-            await invalidateNewItems();
-        } catch (error) {
-            console.error('Failed to submit:', error);
-            setSubmitError(error instanceof Error ? error.message : String(error));
+            setSuccess(`Added ${video.title}.`);
+            // Creation succeeded even if refreshing a list subsequently fails.
+            void Promise.allSettled([
+                invalidateNewItems(),
+                mutate(key => Array.isArray(key) && key[0] === '/api/viewer/tags'),
+            ]);
+            return true;
+        } catch (cause) {
+            setSubmitError(cause instanceof Error ? cause.message : 'Could not add the track. Please try again.');
+            return false;
         } finally {
+            busy.current = false;
             setIsLoading(false);
         }
     };
-
-    useEffect(() => {
-        setIsSubmittable(!!(url && tags && !isPresent));
-    }, [url, tags, isPresent]);
-
     return {
-        isSubmittable,
+        submit,
         isLoading,
         submitError,
-        handleSubmit,
+        success,
+        clearFeedback: () => {
+            setSubmitError(null);
+            setSuccess(null);
+        },
     };
-};
-
-export default useFormSubmit;
+}
