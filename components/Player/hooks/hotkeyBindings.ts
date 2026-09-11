@@ -3,7 +3,7 @@ import { StackActions, StackState } from '../../Contexts/StackControlsProvider';
 export type HotkeyScope = 'global' | 'open' | 'selection' | 'focused';
 
 /** Actions only the card itself can carry out, since they touch its own player and fields. */
-export type CardAction = 'flip' | 'focusFadeTo' | 'loadClipboard';
+export type CardAction = 'flip' | 'loadClipboard';
 
 export interface HotkeyContext {
     state: StackState;
@@ -14,7 +14,13 @@ export interface HotkeyContext {
     setShowHelp: (show: boolean | ((show: boolean) => boolean)) => void;
     /** Fades the selection together, synced, the same way the control panel's buttons do. */
     groupFade: (direction: 'in' | 'out') => void;
-    /** Asks the focused card to run a local action - turning over, focusing its fade field. */
+    /** Sends the whole selection to one absolute volume, synced. */
+    groupFadeTo: (target: number) => void;
+    /** Trims the selection by a step, relative to each player's own level. */
+    groupNudge: (delta: number) => void;
+    /** Opens the fade-to prompt, which reads its digits straight off the keyboard. */
+    openFadePrompt: () => void;
+    /** Asks the focused card to run a local action - turning over, loading the clipboard. */
     emitCardAction: (playerId: number, action: CardAction) => void;
 }
 
@@ -23,6 +29,8 @@ export interface HotkeyBinding {
     /** Matched against a normalised "shift+arrowup" style descriptor. */
     keys: string[];
     scope: HotkeyScope;
+    /** Whether holding the key should keep firing it. Set for the bindings that ramp a volume. */
+    repeatable?: boolean;
     /** How the key reads in the help overlay. */
     display: string;
     label: string;
@@ -31,6 +39,9 @@ export interface HotkeyBinding {
 }
 
 const digits = [1, 2, 3, 4, 5, 6, 7, 8];
+
+/** How far one press of + or - moves the selection. */
+export const NUDGE_STEP = 10;
 
 export const HOTKEY_BINDINGS: HotkeyBinding[] = [
     // ------- GLOBAL -------
@@ -155,8 +166,9 @@ export const HOTKEY_BINDINGS: HotkeyBinding[] = [
         id: 'fade-in',
         keys: ['arrowup'],
         scope: 'selection',
+        repeatable: true,
         display: '↑ ↓',
-        label: 'Fade the selection in or out, synced',
+        label: 'Fade the selection all the way in or out, synced',
         group: 'Selected players',
         run: ctx => ctx.groupFade('in'),
     },
@@ -164,15 +176,48 @@ export const HOTKEY_BINDINGS: HotkeyBinding[] = [
         id: 'fade-out',
         keys: ['arrowdown'],
         scope: 'selection',
+        repeatable: true,
         display: '',
         label: '',
         group: 'Selected players',
         run: ctx => ctx.groupFade('out'),
     },
     {
+        id: 'fade-to-prompt',
+        keys: ['t'],
+        scope: 'selection',
+        display: 'T',
+        label: 'Fade the selection to a typed volume',
+        group: 'Selected players',
+        run: ctx => ctx.openFadePrompt(),
+    },
+    {
+        id: 'nudge-up',
+        // Both the numpad and the main row report these through `key`, so one descriptor covers
+        // the pair without either being named specially.
+        keys: ['+'],
+        scope: 'selection',
+        repeatable: true,
+        display: '+  −',
+        label: `Trim the selection up or down by ${NUDGE_STEP}`,
+        group: 'Selected players',
+        run: ctx => ctx.groupNudge(NUDGE_STEP),
+    },
+    {
+        id: 'nudge-down',
+        keys: ['-'],
+        scope: 'selection',
+        repeatable: true,
+        display: '',
+        label: '',
+        group: 'Selected players',
+        run: ctx => ctx.groupNudge(-NUDGE_STEP),
+    },
+    {
         id: 'master-up',
         keys: ['shift+arrowup'],
         scope: 'global',
+        repeatable: true,
         display: 'Shift + ↑ ↓',
         label: 'Master volume',
         group: 'Selected players',
@@ -182,6 +227,7 @@ export const HOTKEY_BINDINGS: HotkeyBinding[] = [
         id: 'master-down',
         keys: ['shift+arrowdown'],
         scope: 'global',
+        repeatable: true,
         display: '',
         label: '',
         group: 'Selected players',
@@ -199,15 +245,6 @@ export const HOTKEY_BINDINGS: HotkeyBinding[] = [
         run: ctx => ctx.focusedId !== null && ctx.emitCardAction(ctx.focusedId, 'flip'),
     },
     {
-        id: 'focus-fade-to',
-        keys: ['t'],
-        scope: 'focused',
-        display: 'T',
-        label: 'Focus the fade-to field',
-        group: 'Focused player',
-        run: ctx => ctx.focusedId !== null && ctx.emitCardAction(ctx.focusedId, 'focusFadeTo'),
-    },
-    {
         id: 'load-clipboard',
         keys: ['l'],
         scope: 'focused',
@@ -222,16 +259,18 @@ export const HOTKEY_BINDINGS: HotkeyBinding[] = [
  * Builds the descriptor a binding's `keys` are matched against.
  *
  * Letters and punctuation come from `key`, which is layout-independent for a-z; digits come from
- * `code`, so the number row stays distinguishable from the numpad. Shift is only part of the
- * descriptor for keys where it is not already needed to type the character.
+ * `code`, which folds the number row and the numpad onto the same `digitN` descriptor and keeps
+ * both working regardless of Num Lock - with it off, or with Shift held, the numpad reports `key`
+ * as "End"/"ArrowDown"/etc. while the code stays `Numpad1`. Shift is only part of the descriptor
+ * for keys where it is not already needed to type the character.
  */
 export function describeEvent(event: KeyboardEvent): string {
-    const isDigit = /^Digit[1-8]$/.test(event.code);
-    const base = isDigit
-        ? event.code.toLowerCase()
+    const digit = /^(?:Digit|Numpad)([1-8])$/.exec(event.code);
+    const base = digit
+        ? `digit${digit[1]}`
         : event.key === ' ' ? 'space' : event.key.toLowerCase();
 
-    const shifted = event.shiftKey && (isDigit || event.key.startsWith('Arrow'));
+    const shifted = event.shiftKey && (digit !== null || event.key.startsWith('Arrow'));
 
     return shifted ? `shift+${base}` : base;
 }

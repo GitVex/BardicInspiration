@@ -9,7 +9,7 @@ import { useTrackByVideoId } from './hooks/useTrackByVideoId';
 import { useVideoTitle } from './hooks/useVideoTitle';
 import ScrollTitle from '../Viewer/ScrollTitle';
 import { CARD_ACTION_EVENT, CardActionDetail } from './PlayerHotkeys';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
 function PlayerComponent() {
     const { selected, setSelected, playerId, videoId, framePlayer, localVolume, setLocalVolume } =
@@ -17,7 +17,6 @@ function PlayerComponent() {
     const { focusedPlayerId, masterVolumeModifier } = useStackState();
     const { debouncedPresetDispatch } = useStackActions();
     const { registerSlot } = usePlayerHolder();
-    const fadeToRef = useRef<HTMLInputElement | null>(null);
 
     // The focused player is by definition selected - it is the last one selected - so yellow wins
     // over the red the rest of the selection carries.
@@ -39,13 +38,6 @@ function PlayerComponent() {
 
             if (action === 'flip') {
                 setShowSettings(show => !show);
-                return;
-            }
-
-            if (action === 'focusFadeTo') {
-                setShowSettings(false);
-                // after the flip back, so the field is on the visible face
-                setTimeout(() => fadeToRef.current?.focus(), 60);
                 return;
             }
 
@@ -166,7 +158,7 @@ function PlayerComponent() {
 
                             <div className="flex min-w-0 flex-1 flex-col items-stretch justify-center gap-1">
                                 <FadeInButton />
-                                <FadeToInput inputRef={fadeToRef} />
+                                <FadeToInput />
                                 <FadeOutButton />
                             </div>
                         </div>
@@ -392,16 +384,42 @@ function FadeInButton() {
     </button>;
 }
 
-function FadeToInput({ inputRef }: { inputRef?: React.Ref<HTMLInputElement> }) {
+/**
+ * The mouse's way to a target volume. The keyboard's way is T, which opens a prompt that never
+ * takes focus at all - see PlayerHotkeys - and both end up in fadeToVolume, so they cannot
+ * disagree about what a target means.
+ */
+function FadeToInput() {
     const { framePlayer, fadeOptions } = useFadeControls();
 
+    /**
+     * Enter fires the fade and Escape abandons it, and both hand focus back to the document.
+     *
+     * Without that the field is a dead end: while it holds focus the hotkey listener's typing
+     * guard swallows every binding, so the only way out is the mouse.
+     */
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Escape') {
+            // Stopped here rather than left to bubble, so the global Escape does not also read it
+            // as "close the player"
+            e.preventDefault();
+            e.currentTarget.blur();
+            return;
+        }
+
+        fadeInputHandler(e, fadeOptions);
+        if (e.key === 'Enter') e.currentTarget.blur();
+    };
+
     return <input
-        ref={inputRef}
         type="text"
         inputMode="numeric"
         className={`${fieldClass} w-full text-center`}
         placeholder="Fade to"
-        onKeyDown={e => fadeInputHandler(e, fadeOptions)}
+        onKeyDown={handleKeyDown}
+        // The last target is kept as a hint of where this player was put, but arrives selected so
+        // typing replaces it instead of appending to it
+        onFocus={e => e.currentTarget.select()}
         disabled={!framePlayer}
     />;
 }
