@@ -4,6 +4,7 @@ import { buildQuery } from '../../../utils/separateTags';
 import { getAverageColor } from './calculateColor';
 import { ApiError, createRoute, readOptionalString, readString } from '../../../utils/api/handler';
 import { normalizeYoutubeUrl } from '../../../utils/youtubeUrl';
+import { validateCreatorTags } from '../../../utils/creatorTags';
 
 const FALLBACK_COLOR = '#000000';
 
@@ -22,10 +23,13 @@ export default createRoute(['POST'], async (req: NextApiRequest, res: NextApiRes
     } catch {
         throw new ApiError(400, 'url must be a valid youtube link');
     }
-    const tags = readString(body.tags, 'tags');
+    const tags = validateCreatorTags(readString(body.tags, 'tags')).join(',');
     const thumbnail_url = readOptionalString(body.thumbnail_url);
 
     const connectOrCreateQuery = buildQuery(tags);
+
+    const existing = await prisma.track.findFirst({ where: { url }, select: { track_id: true } });
+    if (existing) throw new ApiError(409, 'This track is already in your library.');
 
     let track_color = FALLBACK_COLOR;
     let luminance = 0;
@@ -76,6 +80,9 @@ export default createRoute(['POST'], async (req: NextApiRequest, res: NextApiRes
 
         res.status(201).json(createTrack);
     } catch (e) {
+        if (e && typeof e === 'object' && 'code' in e && e.code === 'P2002') {
+            throw new ApiError(409, 'This track is already in your library.');
+        }
         console.error(`Error creating track: ${e}`);
         throw new ApiError(500, 'Error creating track');
     }
