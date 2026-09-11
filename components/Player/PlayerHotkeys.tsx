@@ -3,7 +3,11 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useStackActions, useStackControls, useStackState } from '../Contexts/StackControlsProvider';
 import { usePlayerHolder } from '../Contexts/PlayerHolderProvider';
 import IFPlayer from './types/IFPlayer';
-import { createGroupFadeHandler } from './ControlPanel/GroupFadeControl';
+import {
+    createGroupFadeHandler,
+    createGroupFadeToHandler,
+    createGroupNudgeHandler,
+} from './ControlPanel/GroupFadeControl';
 import { CardAction, describeEvent, HOTKEY_BINDINGS, HotkeyBinding, HotkeyContext } from './hooks/hotkeyBindings';
 
 export const CARD_ACTION_EVENT = 'bardic:card-action';
@@ -31,15 +35,26 @@ function PlayerHotkeys({ isOpenPlayer, setIsOpenPlayer }: PlayerHotkeysProps) {
     const { holders } = usePlayerHolder();
     const [showHelp, setShowHelp] = useState(false);
 
-    const framedPlayers = useMemo(
-        () => holders.map(holder => holder.player).filter((player): player is IFPlayer => player !== null),
-        [holders],
-    );
+    // Null slots are kept rather than filtered out, so the array stays indexed by player id
+    const players = useMemo<(IFPlayer | null)[]>(() => holders.map(holder => holder.player), [holders]);
 
     const groupFade = useCallback(
-        (direction: 'in' | 'out') => createGroupFadeHandler(direction, framedPlayers, controls)(),
-        [framedPlayers, controls],
+        (direction: 'in' | 'out') => createGroupFadeHandler(direction, players, controls)(),
+        [players, controls],
     );
+
+    const groupFadeTo = useCallback(
+        (target: number) => createGroupFadeToHandler(players, controls)(target),
+        [players, controls],
+    );
+
+    const groupNudge = useCallback(
+        (delta: number) => createGroupNudgeHandler(players, controls)(delta),
+        [players, controls],
+    );
+
+    // null while closed; otherwise the digits typed so far, "" right after it opens
+    const [fadePrompt, setFadePrompt] = useState<string | null>(null);
 
     const emitCardAction = useCallback((playerId: number, action: CardAction) => {
         window.dispatchEvent(new CustomEvent<CardActionDetail>(CARD_ACTION_EVENT, {
@@ -58,11 +73,17 @@ function PlayerHotkeys({ isOpenPlayer, setIsOpenPlayer }: PlayerHotkeysProps) {
         setOpenPlayer: setIsOpenPlayer,
         setShowHelp,
         groupFade,
+        groupFadeTo,
+        groupNudge,
+        openFadePrompt: () => setFadePrompt(''),
         emitCardAction,
     };
 
     const isOpenRef = useRef(isOpenPlayer);
     isOpenRef.current = isOpenPlayer;
+
+    const fadePromptRef = useRef(fadePrompt);
+    fadePromptRef.current = fadePrompt;
 
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
@@ -74,13 +95,22 @@ function PlayerHotkeys({ isOpenPlayer, setIsOpenPlayer }: PlayerHotkeysProps) {
             const ctx = ctxRef.current;
             if (!ctx) return;
 
+            // The prompt is a keyboard mode rather than a field, so it takes every key itself
+            // while it is up - otherwise the digits being typed into it would also re-select
+            // the players behind it.
+            const buffer = fadePromptRef.current;
+            if (buffer !== null) {
+                runFadePrompt(event, buffer, ctx, setFadePrompt);
+                return;
+            }
+
             const descriptor = describeEvent(event);
             const binding = HOTKEY_BINDINGS.find(candidate => candidate.keys.includes(descriptor));
             if (!binding) return;
 
             if (!isAvailable(binding, ctx, isOpenRef.current)) return;
-            // Repeats drive volume, but re-firing a toggle would just flicker it
-            if (event.repeat && !binding.keys.some(key => key.includes('arrow'))) return;
+            // Repeats ramp a volume, but re-firing a toggle would just flicker it
+            if (event.repeat && !binding.repeatable) return;
 
             event.preventDefault();
             binding.run(ctx);
@@ -90,10 +120,93 @@ function PlayerHotkeys({ isOpenPlayer, setIsOpenPlayer }: PlayerHotkeysProps) {
         return () => window.removeEventListener('keydown', onKeyDown);
     }, []);
 
-    return <HotkeyHelp show={showHelp} onClose={() => setShowHelp(false)} />;
+    return (
+        <>
+            <FadePrompt buffer={fadePrompt} count={ctxRef.current.selectedIds.length} />
+            <HotkeyHelp show={showHelp} onClose={() => setShowHelp(false)} />
+        </>
+    );
 }
 
 export default PlayerHotkeys;
+
+/**
+ * The fade-to prompt's key handling.
+ *
+ * Digits are read off `code`, so the numpad types into it as readily as the number row, and a
+ * value that would overshoot 100 is dropped rather than accepted and clamped later - the readout
+ * should never show a number the fade will not honour.
+ */
+function runFadePrompt(
+    event: KeyboardEvent,
+    buffer: string,
+    ctx: HotkeyContext,
+    setBuffer: (buffer: string | null) => void,
+) {
+    // Browser and OS shortcuts stay the browser's - only unmodified keys are the prompt's to take
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+
+    const digit = /^(?:Digit|Numpad)([0-9])$/.exec(event.code);
+
+    if (digit) {
+        event.preventDefault();
+        const next = buffer + digit[1];
+        if (Number.parseInt(next, 10) <= 100) setBuffer(next);
+        return;
+    }
+
+    if (event.key === 'Backspace') {
+        event.preventDefault();
+        setBuffer(buffer.slice(0, -1));
+        return;
+    }
+
+    if (event.key === 'Escape') {
+        event.preventDefault();
+        setBuffer(null);
+        return;
+    }
+
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        const target = Number.parseInt(buffer, 10);
+        if (Number.isFinite(target)) ctx.groupFadeTo(target);
+        setBuffer(null);
+    }
+}
+
+/**
+ * A readout, not an input.
+ *
+ * Deliberately holds no focus: the fade-to field it replaces could only be left with the mouse,
+ * because the listener above stops at anything focusable and every other shortcut went dead for
+ * as long as the caret sat in it.
+ */
+function FadePrompt({ buffer, count }: { buffer: string | null; count: number }) {
+    return (
+        <AnimatePresence>
+            {buffer !== null && (
+                <motion.div
+                    className="pointer-events-none fixed inset-x-0 bottom-10 z-40 flex justify-center"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 8 }}
+                >
+                    <div className="flex flex-row items-baseline gap-3 rounded-xl border border-white/10
+                                    bg-darknavy-600/95 px-5 py-3 shadow-2xl">
+                        <span className="text-sm text-gray-300">
+                            Fade {count === 1 ? 'player' : `${count} players`} to
+                        </span>
+                        <span className="min-w-[2.5ch] text-center font-mono text-2xl tabular-nums text-yellow-400">
+                            {buffer || '––'}
+                        </span>
+                        <span className="text-xs text-gray-400">⏎ to go, Esc to cancel</span>
+                    </div>
+                </motion.div>
+            )}
+        </AnimatePresence>
+    );
+}
 
 function isAvailable(binding: HotkeyBinding, ctx: HotkeyContext, isOpen: boolean): boolean {
     switch (binding.scope) {
@@ -160,6 +273,11 @@ function HotkeyHelp({ show, onClose }: { show: boolean; onClose: () => void }) {
                         </div>
 
                         <p className="mt-5 border-t border-white/10 pt-3 text-xs text-gray-400">
+                            The number row and the numpad are interchangeable throughout &ndash; for selecting a
+                            player, and for typing a volume after T.
+                        </p>
+
+                        <p className="mt-2 text-xs text-gray-400">
                             Clicking a video hands focus to the YouTube player, which swallows key presses.
                             Click anywhere outside it to get the shortcuts back.
                         </p>

@@ -18,6 +18,9 @@ export interface FadeOptions {
     };
 }
 
+/** What a synced fade locks to, so a group of players starts and lands together. */
+export const SYNC_FADE_DURATION = 4000;
+
 function fade({
                   framePlayer,
                   localVolumeControl,
@@ -54,8 +57,6 @@ function fade({
     const startVolume = inverse ? volume : 0;
     const endVolume = inverse ? 0 : limit;
 
-    console.debug('Breakpoint 1', startVolume);
-
     // Play video if not fading out
     if (!inverse) {
         framePlayer.playVideo();
@@ -77,7 +78,7 @@ function fade({
     const volumeChange = endVolume - startVolume;
     // A group fade stays locked to 4s so the players land together; otherwise the player's own
     // setting wins, falling back to the volume-proportional default.
-    const duration = sync ? 4000 : durationMs ?? DEFAULT_FADE_DURATION(volumeChange);
+    const duration = sync ? SYNC_FADE_DURATION : durationMs ?? DEFAULT_FADE_DURATION(volumeChange);
     const startTime = performance.now();
 
     const easeFunc = inverse ? (t: number) => 1 - DEFAULT_EASE(1 - t) : DEFAULT_EASE;
@@ -109,7 +110,14 @@ export function fadeOut(options: FadeOptions) {
     fade({ ...options, inverse: true });
 }
 
-export function fadeTo({ framePlayer, localVolumeControl, fadeAnimationControl, pLimit = 50, durationMs }: FadeOptions) {
+export function fadeTo({
+                           framePlayer,
+                           localVolumeControl,
+                           fadeAnimationControl,
+                           pLimit = 50,
+                           sync = false,
+                           durationMs,
+                       }: FadeOptions) {
     if (!framePlayer) return;
 
     const { localVolume: volume, setLocalVolume: setVolume } = localVolumeControl;
@@ -124,10 +132,8 @@ export function fadeTo({ framePlayer, localVolumeControl, fadeAnimationControl, 
     const startVolume = volume;
     const endVolume = pLimit;
     const volumeChange = endVolume - startVolume;
-    const duration = durationMs ?? DEFAULT_FADE_DURATION(volumeChange);
+    const duration = sync ? SYNC_FADE_DURATION : durationMs ?? DEFAULT_FADE_DURATION(volumeChange);
     const startTime = performance.now();
-
-    console.log('Breakpoint 1', startVolume);
 
     function endFade(finalVolume: number) {
         setVolume(finalVolume);
@@ -153,6 +159,29 @@ export function fadeTo({ framePlayer, localVolumeControl, fadeAnimationControl, 
     setFadeAnimationHandle(animationFrameId);
 }
 
+/**
+ * Sends one player to an absolute volume, picking the fade that fits where it currently is.
+ *
+ * The three fades are not interchangeable: a paused player has to be started rather than ramped
+ * from a level it is not playing at, and a target of zero has to pause it once it arrives. This
+ * is the single place that decides between them, so the fade-to field and the hotkeys cannot
+ * disagree about what "fade to 30" means.
+ */
+export function fadeToVolume(options: FadeOptions) {
+    const { framePlayer, pLimit = 50 } = options;
+    if (!framePlayer) return;
+
+    const targetVolume = Math.max(0, Math.min(100, pLimit));
+    const playing = framePlayer.getPlayerState() === 1;
+
+    // A paused player asked for silence is already there
+    if (!playing && targetVolume === 0) return;
+
+    const fadeAction = !playing ? fadeIn : targetVolume > 0 ? fadeTo : fadeOut;
+
+    fadeAction({ ...options, pLimit: targetVolume });
+}
+
 export function fadeInputHandler(
     e: React.KeyboardEvent<HTMLInputElement>,
     { framePlayer, localVolumeControl, savedVolumeControl, fadeAnimationControl }: FadeOptions,
@@ -163,26 +192,12 @@ export function fadeInputHandler(
     const inputValue = parseInt(e.currentTarget.value);
     if (isNaN(inputValue)) return;
 
-    const targetVolume = inputValue > 100 ? 100 : inputValue; // check input to not go over 100
-
-    let fadeAction;
-    if (framePlayer.getPlayerState() !== 1 && targetVolume > 0) {
-        fadeAction = fadeIn;
-    } else if (framePlayer.getPlayerState() == 1 && targetVolume > 0) {
-        fadeAction = fadeTo;
-    } else if (framePlayer.getPlayerState() == 1 && targetVolume == 0) {
-        fadeAction = fadeOut;
-    } else {
-        return;
-    }
-
-    // Execute the fading action with the provided parameters
-    fadeAction({
+    fadeToVolume({
         framePlayer,
         localVolumeControl,
         savedVolumeControl,
-        fadeAnimationControl: fadeAnimationControl,
-        pLimit: targetVolume,
+        fadeAnimationControl,
+        pLimit: inputValue,
     });
 }
 

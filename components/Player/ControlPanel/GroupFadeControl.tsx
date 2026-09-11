@@ -1,14 +1,28 @@
 import { usePlayerHolder } from '../../Contexts/PlayerHolderProvider';
 import IFPlayer from '../types/IFPlayer';
-import { fadeIn, fadeOut } from '../fadeFunctions';
+import { FadeOptions, fadeIn, fadeOut, fadeToVolume } from '../fadeFunctions';
 import { useStackControls } from '../../Contexts/StackControlsProvider';
+import { PresetState } from '../Contexts/states';
 import ControlPanelButton from './utils/ControlPanelButton';
 import React from 'react';
 
-export function createGroupFadeHandler(
-    direction: 'in' | 'out',
-    framedPlayers: IFPlayer[],
-    controls: ReturnType<typeof useStackControls>
+type StackControls = ReturnType<typeof useStackControls>;
+
+/** How long a nudge takes. Short enough to read as a trim rather than as a cue. */
+export const NUDGE_FADE_DURATION = 250;
+
+/**
+ * Runs a fade over every selected player, with that player's plumbing already assembled - where
+ * to write its volume, which animation handle to cancel, where its pre-fade level is remembered.
+ *
+ * `players` is indexed by player id and holds a null for any slot whose iframe is not ready yet.
+ * It must not be compacted first: dropping a null slides every later player onto the wrong index,
+ * and the fade lands on someone else's card.
+ */
+function eachSelectedPlayer(
+    players: (IFPlayer | null)[],
+    controls: StackControls,
+    run: (options: FadeOptions, currentVolume: number, player: PresetState['players'][number]) => void,
 ) {
     const {
         presetState,
@@ -19,92 +33,93 @@ export function createGroupFadeHandler(
         fadeAnimationsDispatch,
     } = controls;
 
+    presetState.players.forEach((player, idx) => {
+        const framePlayer = players[idx];
+        if (!player.selected || !framePlayer) return;
+
+        const currentVolume = localVolumes.volume[idx];
+
+        run({
+            framePlayer,
+            localVolumeControl: {
+                localVolume: currentVolume,
+                setLocalVolume: (vol: number) =>
+                    localVolumesDispatch({ type: 'setVolume', index: idx, payload: vol }),
+            },
+            fadeAnimationControl: {
+                fadeAnimationHandle: fadeAnimations.fadeAnimationHandles[idx],
+                setFadeAnimationHandle: (handle: number | null) =>
+                    fadeAnimationsDispatch({ type: 'setFadeAnimationHandle', index: idx, payload: handle }),
+            },
+            savedVolumeControl: {
+                savedVolume: player.savedVolume,
+                setSavedVolume: (savedVolume: { hasSaved: boolean; prevVol: number }) =>
+                    presetDispatch({ type: 'setSavedVolume', index: idx, payload: savedVolume }),
+            },
+        }, currentVolume, player);
+    });
+}
+
+export function createGroupFadeHandler(
+    direction: 'in' | 'out',
+    players: (IFPlayer | null)[],
+    controls: StackControls,
+) {
     return () => {
-        // Determine the fade action based on the direction
         const fadeAction = direction === 'in' ? fadeIn : fadeOut;
 
-        presetState.players.forEach((player, idx) => {
-            const framePlayer = framedPlayers[idx];
-            if (!player.selected || !framePlayer) return;
+        eachSelectedPlayer(players, controls, (options, currentVolume, player) => {
+            const targetVolume = direction === 'in'
+                ? (player.savedVolume ? player.savedVolume.prevVol : currentVolume)
+                : 0;
 
-            let targetVolume
-            if (direction == 'in') {
-                if (player.savedVolume) {
-                    targetVolume = player.savedVolume.prevVol
-                } else {
-                    targetVolume = localVolumes.volume[idx]
-                }
-            } else {
-                targetVolume = 0
-            }
-
-            // Functions to update state
-            const setVolume = (vol: number) => {
-                localVolumesDispatch({ type: 'setVolume', index: idx, payload: vol });
-            };
-
-            const fadeAnimationHandle = fadeAnimations.fadeAnimationHandles[idx];
-            const setFadeAnimationHandle = (interval: number | null) => {
-                fadeAnimationsDispatch({
-                    type: 'setFadeAnimationHandle',
-                    index: idx,
-                    payload: interval,
-                });
-            };
-
-            const setSavedVolume = (savedVolume: { hasSaved: boolean; prevVol: number }) => {
-                presetDispatch({
-                    type: 'setSavedVolume',
-                    index: idx,
-                    payload: savedVolume,
-                });
-            };
-
-            fadeAction({
-                framePlayer,
-                localVolumeControl: {
-                    localVolume: localVolumes.volume[idx],
-                    setLocalVolume: setVolume,
-                },
-                fadeAnimationControl: {
-                    fadeAnimationHandle,
-                    setFadeAnimationHandle,
-                },
-                savedVolumeControl: {
-                    savedVolume: player.savedVolume,
-                    setSavedVolume,
-                },
-                pLimit: targetVolume,
-                inverse: direction === 'out',
-                sync: true
-            });
+            fadeAction({ ...options, pLimit: targetVolume, sync: true });
         });
+    };
+}
+
+/**
+ * Sends the whole selection to one absolute volume, locked to the synced duration so they land
+ * together - the same contract the fade in and out buttons already have.
+ */
+export function createGroupFadeToHandler(players: (IFPlayer | null)[], controls: StackControls) {
+    return (target: number) => {
+        eachSelectedPlayer(players, controls, options =>
+            fadeToVolume({ ...options, pLimit: target, sync: true }));
+    };
+}
+
+/**
+ * Trims the selection by a fixed step.
+ *
+ * Relative to each player's own level rather than to a shared one, so nudging a mix moves it as a
+ * whole and keeps the balance the user has already dialled in.
+ */
+export function createGroupNudgeHandler(players: (IFPlayer | null)[], controls: StackControls) {
+    return (delta: number) => {
+        eachSelectedPlayer(players, controls, (options, currentVolume) =>
+            fadeToVolume({ ...options, pLimit: currentVolume + delta, durationMs: NUDGE_FADE_DURATION }));
     };
 }
 
 function GroupFadeControl({ initialLoadDone }: { initialLoadDone: boolean }) {
     const { holders } = usePlayerHolder();
 
-    // Filter out null framedPlayers early. Memoised on holders, because .map().filter() built a
-    // new array every render, which changed the identity the handlers below key off and made
-    // memoising them pointless.
-    const framedPlayers = React.useMemo(
-        () => holders
-            .map(holder => holder.player)
-            .filter((player): player is IFPlayer => player !== null),
-        [holders],
-    );
+    // Memoised on holders, because .map() built a new array every render, which changed the
+    // identity the handlers below key off and made memoising them pointless. The nulls are kept
+    // so the array stays indexed by player id - see eachSelectedPlayer.
+    const players = React.useMemo(() => holders.map(holder => holder.player), [holders]);
 
     const controls = useStackControls();
 
     const handleGroupFadeIn = React.useMemo(
-        () => createGroupFadeHandler('in', framedPlayers, controls),
-        [framedPlayers, controls],
+        () => createGroupFadeHandler('in', players, controls),
+        [players, controls],
     );
 
     const handleGroupFadeOut = React.useMemo(
-        () => createGroupFadeHandler('out', framedPlayers, controls),
-        [framedPlayers, controls],
+        () => createGroupFadeHandler('out', players, controls),
+        [players, controls],
     );
 
     // Naming the count is the point of the redesign: the buttons act on the selection above them,
