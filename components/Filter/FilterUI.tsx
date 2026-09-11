@@ -1,86 +1,169 @@
-import React, { useState } from 'react';
+import { useId, useState } from 'react';
 import { useFilter } from '../Contexts/FilterStateProvider';
 import TagItem from './TagItem';
 import useTags from './hooks/useTags';
-import { AnimatePresence } from 'framer-motion';
-import LoadingAnim from '../utils/LoadingAnimDismount';
+import { isTrackType, selectTrackType, trackTypes } from './filterTypes';
 
-// Define the sorting function
-function sortTags(a: string, b: string, filter: string[]): number {
-    const aInFilter = filter.includes(a);
-    const bInFilter = filter.includes(b);
-
-    if (aInFilter && bInFilter) {
-        return 0;
-    } else if (aInFilter) {
-        return -1;
-    } else if (bInFilter) {
-        return 1;
-    } else {
-        return a.localeCompare(b);
-    }
-}
-
-function FilterUI() {
+export default function FilterUI({ onClose, mobile = false }: { onClose: () => void; mobile?: boolean }) {
     const { filter, setFilter } = useFilter();
-    const { tags, isLoading, isError } = useTags();
-
+    const { tags, isLoading, isError, retry } = useTags();
     const [search, setSearch] = useState('');
-    const globalDisable = isLoading;
-
-    const onChangeCallback = (e: any) => {
-        const { checked, name } = e.target;
-
-        setFilter((prev) => {
-            if (checked) {
-                return [...prev, name];
-            } else {
-                return prev.filter((tag) => tag !== name);
-            }
-        });
-    };
+    const searchId = useId();
+    const typeName = useId();
+    const selectedType = filter.find(isTrackType) ?? '';
+    const selectedTags = filter.filter(tag => !isTrackType(tag));
+    // Switching type replaces the current type while keeping descriptive tags.
+    const typeOptions = useTags(selectedTags);
+    const availableTags = [...new Set([...(tags ?? []), ...selectedTags])]
+        .filter(tag => !isTrackType(tag) && tag.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
+        .sort((a, b) => a.localeCompare(b));
+    const changeTag = (tag: string, checked: boolean) =>
+        setFilter(previous => (checked ? [...new Set([...previous, tag])] : previous.filter(value => value !== tag)));
+    const actionClass =
+        'min-h-[44px] rounded px-3 text-sm text-gray-300 hover:bg-darknavy-500 disabled:opacity-40 focus-visible:outline focus-visible:outline-indigo-400';
 
     return (
-        <div className="h-full w-full  p-6">
-            <div className="flex flex-col gap-2 h-full w-full rounded bg-indigo-800/25 p-2">
-                <input
-                    type="text"
-                    className="w-full rounded bg-indigo-800/25 p-2"
-                    placeholder="Search..."
-                    onChange={(e) => {
-                        setSearch(e.target.value);
-                    }}
-                />
-                <div className="flex max-h-full w-full flex-row flex-wrap gap-2 overflow-y-auto">
-                    <AnimatePresence mode="wait">
-                        {isLoading && (
-                            <div key="loader" className="flex justify-center items-center w-full min-h-64">
-                                <LoadingAnim />
-                            </div>
+        <div className="flex h-full min-h-0 flex-col gap-4 p-5 text-gray-200">
+            <header className="flex shrink-0 items-center justify-between gap-3">
+                <h2 id="filter-panel-title" className="text-lg font-semibold">
+                    Filters
+                </h2>
+                <button type="button" onClick={onClose} aria-label="Close filters" className={actionClass}>
+                    &times;
+                </button>
+            </header>
+            <div className="flex min-h-0 shrink flex-col gap-4 overflow-y-auto">
+                <fieldset>
+                    <legend className="mb-2 text-sm font-medium">Track type</legend>
+                    <div className="grid grid-cols-2 gap-1 rounded border border-darknavy-700 bg-darknavy-800 p-1 min-[380px]:grid-cols-4">
+                        {['', ...trackTypes].map(type => {
+                            const disabled =
+                                type !== '' &&
+                                type !== selectedType &&
+                                (typeOptions.isLoading || !!typeOptions.isError || !typeOptions.tags?.includes(type));
+                            return (
+                                <label
+                                    key={type}
+                                    className={`relative flex min-h-[44px] cursor-pointer items-center justify-center rounded px-2 text-sm capitalize focus-within:ring-2 focus-within:ring-indigo-400 ${
+                                        disabled
+                                            ? 'cursor-not-allowed text-gray-500 opacity-50'
+                                            : selectedType === type
+                                            ? 'bg-indigo-500/20 text-white'
+                                            : 'text-gray-400 hover:bg-darknavy-500'
+                                    }`}
+                                >
+                                    <input
+                                        className="sr-only"
+                                        type="radio"
+                                        name={typeName}
+                                        value={type}
+                                        checked={selectedType === type}
+                                        disabled={disabled}
+                                        onChange={() => setFilter(previous => selectTrackType(previous, type))}
+                                    />
+                                    {type || 'All'}
+                                </label>
+                            );
+                        })}
+                    </div>
+                    <p className="mt-2 text-xs text-gray-400">Tracks must match the type and all selected tags.</p>
+                </fieldset>
+                <section aria-label="Selected tags">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                        <h3 className="text-sm font-medium">Tags &middot; {selectedTags.length} selected</h3>
+                        <button
+                            type="button"
+                            disabled={!selectedTags.length}
+                            onClick={() => setFilter(previous => previous.filter(isTrackType))}
+                            className={actionClass}
+                        >
+                            Clear tags
+                        </button>
+                    </div>
+                    <div className="flex max-h-24 flex-wrap gap-2 overflow-y-auto">
+                        {selectedTags.length ? (
+                            selectedTags.map(tag => (
+                                <button
+                                    key={tag}
+                                    type="button"
+                                    aria-label={`Remove ${tag}`}
+                                    onClick={() => changeTag(tag, false)}
+                                    className="min-h-[44px] max-w-full break-words rounded border border-indigo-400/40 bg-indigo-500/20 px-3 py-2 text-sm hover:bg-indigo-500/30 focus-visible:outline focus-visible:outline-indigo-400"
+                                >
+                                    {tag} <span aria-hidden="true">&times;</span>
+                                </button>
+                            ))
+                        ) : (
+                            <p className="text-sm text-gray-400">Choose tags to narrow your results.</p>
                         )}
-                        {isError && <div>Error loading tags.</div>}
-                        {tags &&
-                            (tags.sort((a: string, b: string) => sortTags(a, b, filter)).map((tag: string, index: number) => {
-                                return (
-                                    (tag.includes(search) ||
-                                        search === '' ||
-                                        filter.includes(tag)) && (
-                                        <TagItem
-                                            tag={tag}
-                                            index={index}
-                                            globalDisable={globalDisable}
-                                            onChangeCallback={onChangeCallback}
-                                            isInFilter={filter.includes(tag)}
-                                        />
-                                    )
-                                );
-                            }))
-                        }
-                    </AnimatePresence>
+                    </div>
+                </section>
+                <div>
+                    <label htmlFor={searchId} className="mb-2 block text-sm font-medium">
+                        Search tags
+                    </label>
+                    <input
+                        id={searchId}
+                        type="search"
+                        value={search}
+                        onChange={event => setSearch(event.target.value)}
+                        placeholder="Search tags..."
+                        className="w-full rounded border border-darknavy-700 bg-darknavy-500 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                    />
                 </div>
             </div>
+            <section
+                aria-label="Available tags"
+                className="min-h-[80px] flex-1 overflow-y-auto border-t border-darknavy-700 pt-4"
+            >
+                {isLoading && (
+                    <p role="status" className="text-sm text-gray-400">
+                        Loading tags...
+                    </p>
+                )}
+                {isError && (
+                    <div role="alert" className="text-sm text-gray-300">
+                        Could not load tags.{' '}
+                        <button
+                            type="button"
+                            onClick={() => void retry()}
+                            className="rounded underline focus-visible:outline focus-visible:outline-indigo-400"
+                        >
+                            Try again
+                        </button>
+                    </div>
+                )}
+                {!isLoading && !isError && !availableTags.length && (
+                    <p role="status" className="text-sm text-gray-400">
+                        {search.trim() ? 'No tags match your search.' : 'No tags available yet.'}
+                    </p>
+                )}
+                <div className="flex flex-wrap content-start gap-2">
+                    {availableTags.map(tag => (
+                        <TagItem
+                            key={tag}
+                            tag={tag}
+                            selected={filter.includes(tag)}
+                            disabled={!filter.includes(tag) && (isLoading || !!isError)}
+                            onChange={changeTag}
+                        />
+                    ))}
+                </div>
+            </section>
+            <footer className="flex shrink-0 items-center justify-between border-t border-darknavy-700 pb-[env(safe-area-inset-bottom)] pt-3">
+                <button type="button" disabled={!filter.length} onClick={() => setFilter([])} className={actionClass}>
+                    Reset filters
+                </button>
+                {mobile && (
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="min-h-[44px] rounded border border-indigo-400/40 bg-indigo-500/20 px-6 text-sm hover:bg-indigo-500/30 focus-visible:outline focus-visible:outline-indigo-400"
+                    >
+                        Done
+                    </button>
+                )}
+            </footer>
         </div>
     );
 }
-
-export default FilterUI;
