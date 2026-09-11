@@ -9,11 +9,11 @@ Prisma is used as a middleware ORM, connecting to a Postgres database hosted on 
 
 ## Deployment
 
-BardicInspiration is deploying both the development and production environment on a hosted VPS server. The latest version of the application can be found at [bardicinspiration.cc](https://bardicinspiration.cc) for the `main` branch and [dev.bardicinspiration.cc](https://dev.bardicinspiration.cc) for the `dev` branch.
+BardicInspiration is deployed on a hosted VPS managed by [Coolify](https://coolify.io), which builds and rolls out every push to `dev` from `compose.yaml`. The live application can be found at [dev.bardicinspiration.cc](https://dev.bardicinspiration.cc).
 
 ## Contributing
 
-Contributions are welcome! There are a few issues with an explicit "Help wanted" tag, though your input on any open issues is very welcome. If you're interested in contributing, please create a new branch or fork the repository to avoid disturbing the current main/dev branch. Once you're ready, you can open a pull request with your changes.
+Contributions are welcome! There are a few issues with an explicit "Help wanted" tag, though your input on any open issues is very welcome. If you're interested in contributing, please branch off `dev` or fork the repository rather than committing to `dev` directly. Once you're ready, you can open a pull request with your changes.
 
 ## Contact
 

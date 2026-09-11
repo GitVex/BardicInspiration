@@ -1,6 +1,9 @@
 name: dev_bardic
 services:
   app:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: ghcr.io/gitvex/bardicinspiration_dev:latest
     environment:
       - SERVICE_FQDN_APP_3000
